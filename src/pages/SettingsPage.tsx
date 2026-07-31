@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { Save, X, Building2, Bell, Palette, Shield, Plug, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { globalSettingsApi, authApi } from "@/lib/api";
+import { globalSettingsApi, authApi, usersApi } from "@/lib/api";
+import { useAuth } from "@/components/auth/AuthContext";
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -55,10 +56,12 @@ function ToggleRow({ label, desc, checked, onChange }: { label: string; desc?: s
 
 export default function SettingsPage() {
   const { t } = useTranslation();
+  const { user, saveSession } = useAuth();
   const [saved, setSaved] = useState(false);
+  const [fullName, setFullName] = useState(user?.fullName || "Admin User");
   const [businessName, setBusinessName] = useState("VibeNests Luxury");
-  const [email, setEmail] = useState("admin@vibenests.com");
-  const [phone, setPhone] = useState("+91 98765 43210");
+  const [email, setEmail] = useState(user?.email || "admin@vibenests.com");
+  const [phone, setPhone] = useState(user?.phone || "+91 98765 43210");
   const [address, setAddress] = useState("Hyderabad, Telangana, India");
   const [currency, setCurrency] = useState("INR (₹)");
   const [timezone, setTimezone] = useState("Asia/Kolkata (IST)");
@@ -87,10 +90,15 @@ export default function SettingsPage() {
   const [passwordUpdating, setPasswordUpdating] = useState(false);
 
   useEffect(() => {
+    // Fetch real authenticated user profile
+    usersApi.getMe().then((me) => {
+      if (me.fullName) setFullName(me.fullName);
+      if (me.email) setEmail(me.email);
+      if (me.phone) setPhone(me.phone);
+    }).catch(console.error);
+
     globalSettingsApi.getAll().then(data => {
       if (data.businessName !== undefined) setBusinessName(data.businessName);
-      if (data.email !== undefined) setEmail(data.email);
-      if (data.phone !== undefined) setPhone(data.phone);
       if (data.address !== undefined) setAddress(data.address);
       if (data.currency !== undefined) setCurrency(data.currency);
       if (data.timezone !== undefined) setTimezone(data.timezone);
@@ -118,6 +126,21 @@ export default function SettingsPage() {
 
   async function handleSave() {
     try {
+      // 1. Update real user profile on backend
+      const updatedUser = await usersApi.updateMe({ fullName, email, phone });
+      
+      // Update session in AuthContext
+      const accessToken = localStorage.getItem('accessToken') || '';
+      const refreshToken = localStorage.getItem('refreshToken') || '';
+      saveSession(accessToken, refreshToken, {
+        ...user,
+        ...updatedUser,
+        fullName: updatedUser.fullName || fullName,
+        email: updatedUser.email || email,
+        phone: updatedUser.phone || phone,
+      });
+
+      // 2. Update global settings
       await globalSettingsApi.updateBulk({
         businessName, email, phone, address, currency, timezone, language,
         emailBooking, emailCancellation, emailPayment, smsBooking, pushAlerts, dailyReport,
@@ -125,6 +148,7 @@ export default function SettingsPage() {
         twoFactor, loginAlerts, sessionTimeout,
         razorpayKey, razorpayEnabled, whatsappEnabled, whatsappNumber, analyticsId
       });
+
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
       
@@ -178,6 +202,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <Field label="Admin Name"><Input value={fullName} onChange={setFullName} placeholder="Admin Full Name" /></Field>
                 <Field label={t("app.admin.businessName", "Business Name")}><Input value={businessName} onChange={setBusinessName} placeholder="Your business name" /></Field>
                 <Field label={t("app.admin.contactEmail", "Contact Email")}><Input value={email} onChange={setEmail} type="email" placeholder="admin@example.com" /></Field>
                 <Field label={t("app.admin.phoneNumber", "Phone Number")}><Input value={phone} onChange={setPhone} placeholder="+91 XXXXX XXXXX" /></Field>

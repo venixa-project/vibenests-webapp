@@ -16,11 +16,11 @@ import { reviewsApi, bookingsApi } from "@/lib/api";
 type CategoryKey = "ambience" | "cleanliness" | "service" | "decoration" | "value";
 
 const CATEGORIES: { key: CategoryKey; label: string }[] = [
-  { key: "ambience",    label: "Ambience"        },
-  { key: "cleanliness", label: "Cleanliness"     },
-  { key: "service",     label: "Service"         },
-  { key: "decoration",  label: "Decoration"      },
-  { key: "value",       label: "Value for Money" },
+  { key: "ambience", label: "Ambience" },
+  { key: "cleanliness", label: "Cleanliness" },
+  { key: "service", label: "Service" },
+  { key: "decoration", label: "Decoration" },
+  { key: "value", label: "Value for Money" },
 ];
 
 const OVERALL_LABELS: Record<number, string> = {
@@ -32,17 +32,17 @@ const OVERALL_COLORS: Record<number, string> = {
 };
 
 const NAV_ITEMS = [
-  { id: "dashboard",    label: "Dashboard",                    icon: LayoutDashboard },
-  { id: "suites",       label: "Browse Suites",                icon: BedDouble },
-  { id: "my-bookings",  label: "My Bookings",                  icon: CalendarDays },
-  { id: "upcoming",     label: "Upcoming Bookings",            icon: Clock },
-  { id: "past",         label: "Past Bookings",                icon: History },
-  { id: "wallet",       label: "Payments",            icon: Wallet },
-  { id: "packages",     label: "Celebration Packages",         icon: Package },
-  { id: "offers",       label: "Special Offers",   icon: Tag },
-  { id: "profile",      label: "Profile Settings",             icon: UserCircle },
-  { id: "help",         label: "Help & Support",               icon: HelpCircle },
-  { id: "write-review", label: "Write a Review",               icon: Star },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "suites", label: "Browse Suites", icon: BedDouble },
+  { id: "my-bookings", label: "My Bookings", icon: CalendarDays },
+  { id: "upcoming", label: "Upcoming Bookings", icon: Clock },
+  { id: "past", label: "Past Bookings", icon: History },
+  { id: "wallet", label: "Payments", icon: Wallet },
+  { id: "packages", label: "Celebration Packages", icon: Package },
+  { id: "offers", label: "Special Offers", icon: Tag },
+  { id: "profile", label: "Profile Settings", icon: UserCircle },
+  { id: "help", label: "Help & Support", icon: HelpCircle },
+  { id: "write-review", label: "Write a Review", icon: Star },
 ];
 
 /* ─── Star Rating ────────────────────────────────────── */
@@ -73,11 +73,11 @@ export default function WriteReviewPage() {
   const displayName = user?.fullName || t("app.userDashboard.welcome_back_name", "Guest");
   const displayLetter = displayName ? displayName.charAt(0).toUpperCase() : "U";
   const displayEmail = user?.email || "";
-  
+
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
-  
+
   const completedBookings = bookings.filter((b) => b.status === "completed" && !b.hasReview);
   const isGeneralReview = completedBookings.length === 0;
   const selectedBooking = bookings.find((b) => b.id === selectedBookingId);
@@ -87,8 +87,8 @@ export default function WriteReviewPage() {
   const [ratings, setRatings] = useState<Record<CategoryKey, number>>({
     ambience: 0, cleanliness: 0, service: 0, decoration: 0, value: 0,
   });
-  const [overall, setOverall]     = useState(0);
-  const [review, setReview]       = useState("");
+  const [overall, setOverall] = useState(0);
+  const [review, setReview] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showError, setShowError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -149,7 +149,7 @@ export default function WriteReviewPage() {
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--background)]">
 
       {/* ── Top bar ── */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-white/5 glass backdrop-blur-xl">
+      <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 h-[88px] border-b border-white/5 glass backdrop-blur-xl shrink-0">
         <div className="flex items-center gap-4">
           <button onClick={() => setSidebarOpen((o) => !o)}
             className="flex lg:hidden flex-col justify-center items-center gap-[5px] p-2 rounded-lg hover:bg-white/5 transition-colors group"
@@ -158,13 +158,13 @@ export default function WriteReviewPage() {
             <span className={`block h-0.5 bg-muted-foreground group-hover:bg-gold transition-all duration-300 ${sidebarOpen ? "w-0 opacity-0" : "w-5"}`} />
             <span className={`block h-0.5 bg-muted-foreground group-hover:bg-gold transition-all duration-300 ${sidebarOpen ? "w-5 -translate-y-[7px] -rotate-45" : "w-5"}`} />
           </button>
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 shrink-0 rounded-lg overflow-hidden">
-              <img src="/logo.png" alt="VibeNests" className="h-full w-full object-contain" />
+          <div className="flex items-center gap-2">
+            <div className="h-[72px] w-[72px] shrink-0 rounded-lg">
+              <img src="/image.png" alt="VibeNests" className="h-full w-full object-contain" />
             </div>
             <div className="leading-tight">
-              <p className="font-display text-sm font-semibold tracking-[0.15em] text-gradient-gold">VIBENESTS</p>
-              <p className="text-[9px] tracking-[0.25em] text-muted-foreground uppercase">{t("app.userDashboard.brandSub", "Private Luxury Suites")}</p>
+              <p className="font-display text-2xl font-semibold tracking-wide text-gradient-gold">VIBENESTS</p>
+              <p className="text-[10px] tracking-widest text-muted-foreground uppercase">{t("app.userDashboard.brandSub", "Private Luxury Suites")}</p>
             </div>
           </div>
         </div>
@@ -213,17 +213,17 @@ export default function WriteReviewPage() {
               const active = id === "write-review";
               const translatedLabel =
                 id === "dashboard" ? t("app.userDashboard.dashboard", "Dashboard") :
-                id === "suites" ? t("app.userDashboard.browseSuites", "Browse Suites") :
-                id === "my-bookings" ? t("app.userDashboard.myBookings", "My Bookings") :
-                id === "upcoming" ? t("app.userDashboard.upcomingBookings", "Upcoming Bookings") :
-                id === "past" ? t("app.userDashboard.pastBookings", "Past Bookings") :
-                id === "wallet" ? t("app.userDashboard.walletPayments", "Payments") :
-                id === "packages" ? t("app.userDashboard.celebrationPackages", "Celebration Packages") :
-                id === "offers" ? t("app.userDashboard.specialOffersReferrals", "Special Offers") :
-                id === "profile" ? t("app.userDashboard.profileSettings", "Profile Settings") :
-                id === "help" ? t("app.userDashboard.helpSupport", "Help & Support") :
-                id === "write-review" ? t("app.userDashboard.writeReview", "Write a Review") :
-                label;
+                  id === "suites" ? t("app.userDashboard.browseSuites", "Browse Suites") :
+                    id === "my-bookings" ? t("app.userDashboard.myBookings", "My Bookings") :
+                      id === "upcoming" ? t("app.userDashboard.upcomingBookings", "Upcoming Bookings") :
+                        id === "past" ? t("app.userDashboard.pastBookings", "Past Bookings") :
+                          id === "wallet" ? t("app.userDashboard.walletPayments", "Payments") :
+                            id === "packages" ? t("app.userDashboard.celebrationPackages", "Celebration Packages") :
+                              id === "offers" ? t("app.userDashboard.specialOffersReferrals", "Special Offers") :
+                                id === "profile" ? t("app.userDashboard.profileSettings", "Profile Settings") :
+                                  id === "help" ? t("app.userDashboard.helpSupport", "Help & Support") :
+                                    id === "write-review" ? t("app.userDashboard.writeReview", "Write a Review") :
+                                      label;
               return (
                 <button key={id} onClick={() => handleNav(id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 border rounded-xl text-sm transition-all ${active ? "bg-gold/15 border-gold/25 text-gold font-medium" : "border-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground"}`}>
@@ -346,9 +346,8 @@ export default function WriteReviewPage() {
                           {completedBookings.map((b) => (
                             <div
                               key={b.id}
-                              className={`glass-card rounded-xl p-4 flex flex-col justify-between border transition-all ${
-                                selectedBookingId === b.id ? "border-gold bg-gold/5" : "border-white/5 hover:border-white/10"
-                              }`}
+                              className={`glass-card rounded-xl p-4 flex flex-col justify-between border transition-all ${selectedBookingId === b.id ? "border-gold bg-gold/5" : "border-white/5 hover:border-white/10"
+                                }`}
                             >
                               <div className="space-y-2">
                                 <div className="flex items-start justify-between">
@@ -371,11 +370,10 @@ export default function WriteReviewPage() {
                               <div className="mt-4">
                                 <button
                                   onClick={() => setSelectedBookingId(b.id)}
-                                  className={`w-full text-center py-2 text-xs font-semibold rounded-lg transition-all ${
-                                    selectedBookingId === b.id
-                                      ? "bg-gold text-[oklch(0.12_0.02_260)]"
-                                      : "bg-gold/10 hover:bg-gold/15 text-gold border border-gold/20"
-                                  }`}
+                                  className={`w-full text-center py-2 text-xs font-semibold rounded-lg transition-all ${selectedBookingId === b.id
+                                    ? "bg-gold text-[oklch(0.12_0.02_260)]"
+                                    : "bg-gold/10 hover:bg-gold/15 text-gold border border-gold/20"
+                                    }`}
                                 >
                                   {selectedBookingId === b.id
                                     ? t("app.userDashboard.selectedForReview", "Selected")
@@ -451,9 +449,8 @@ export default function WriteReviewPage() {
                                       size="sm"
                                     />
                                     <span
-                                      className={`text-xs w-16 text-right transition-colors ${
-                                        ratings[key] ? "text-gold" : "text-muted-foreground"
-                                      }`}
+                                      className={`text-xs w-16 text-right transition-colors ${ratings[key] ? "text-gold" : "text-muted-foreground"
+                                        }`}
                                     >
                                       {ratings[key] ? t("app.userDashboard.overallLabels_" + ratings[key], OVERALL_LABELS[ratings[key]]) : "—"}
                                     </span>
@@ -525,13 +522,12 @@ export default function WriteReviewPage() {
                               {t("app.userDashboard.charsLimit", "Be specific and honest — your feedback matters.")}
                             </p>
                             <span
-                              className={`text-[11px] font-mono ${
-                                review.length >= MAX_CHARS
-                                  ? "text-rose-400"
-                                  : review.length > 800
+                              className={`text-[11px] font-mono ${review.length >= MAX_CHARS
+                                ? "text-rose-400"
+                                : review.length > 800
                                   ? "text-amber-400"
                                   : "text-muted-foreground"
-                              }`}
+                                }`}
                             >
                               {review.length} / {MAX_CHARS}
                             </span>
@@ -600,9 +596,9 @@ export default function WriteReviewPage() {
                   </div>
                   <div className="space-y-3">
                     {[
-                      { icon: Star,         text: t("app.userDashboard.choosePerfectSuite", "Helps future guests choose the perfect suite") },
-                      { icon: Sparkles,     text: t("app.userDashboard.motivateTeam", "Motivates our team to maintain luxury standards") },
-                      { icon: ThumbsUp,     text: t("app.userDashboard.shapeImprovements", "Your insights directly shape service improvements") },
+                      { icon: Star, text: t("app.userDashboard.choosePerfectSuite", "Helps future guests choose the perfect suite") },
+                      { icon: Sparkles, text: t("app.userDashboard.motivateTeam", "Motivates our team to maintain luxury standards") },
+                      { icon: ThumbsUp, text: t("app.userDashboard.shapeImprovements", "Your insights directly shape service improvements") },
                       { icon: CheckCircle2, text: t("app.userDashboard.verifiedReviews", "Verified reviews build trust in our community") },
                     ].map(({ icon: Icon, text }, i) => (
                       <motion.div key={i} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}
@@ -622,11 +618,11 @@ export default function WriteReviewPage() {
                   </div>
                   {overall > 0 && (
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                       className="rounded-xl bg-gold/8 border border-gold/20 p-4 space-y-2">
+                      className="rounded-xl bg-gold/8 border border-gold/20 p-4 space-y-2">
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{t("app.userDashboard.ratingPreview", "Rating Preview")}</p>
                       <div className="flex items-center gap-2">
                         <div className="flex gap-0.5">
-                          {[1,2,3,4,5].map((s) => (
+                          {[1, 2, 3, 4, 5].map((s) => (
                             <Star key={s} className={`h-4 w-4 ${s <= overall ? "fill-gold text-gold" : "fill-transparent text-white/15"}`} />
                           ))}
                         </div>

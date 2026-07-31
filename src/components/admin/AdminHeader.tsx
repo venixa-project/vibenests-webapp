@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, Search, ChevronDown, User, Settings, LogOut, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { NotificationPanel, type Notification } from "./NotificationPanel";
 import { LanguageSelector } from "@/components/shared/LanguageSelector";
 import { useTranslation } from "react-i18next";
+import { appNotificationsApi } from "@/lib/api";
 import { useSidebar } from "@/components/admin/SidebarContext";
+import { useAuth } from "@/components/auth/AuthContext";
 
 const titleKeys: { [key: string]: string } = {
   "Transactions": "transactions",
@@ -35,32 +37,56 @@ export function AdminHeader({ title }: AdminHeaderProps) {
   const [notifications, setNotifications] = useState<Notification[] | undefined>(undefined);
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    appNotificationsApi.getMine()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setNotifications(data.map((n: any) => ({
+            id: String(n.id),
+            type: (n.type as any) || "system",
+            title: n.title,
+            message: n.message,
+            time: n.createdAt ? new Date(n.createdAt).toISOString() : new Date().toISOString(),
+            read: Boolean(n.isRead),
+          })));
+        }
+      })
+      .catch((err) => console.warn("Failed to fetch admin notifications:", err));
+  }, [user?.id, notifOpen]);
 
   function handleMarkAllRead() {
-    // TODO: call API then update state
-    setNotifications((prev) =>
-      (prev ?? []).map((n) => ({ ...n, read: true }))
-    );
+    appNotificationsApi.markAllRead()
+      .then(() => {
+        setNotifications((prev) => (prev ?? []).map((n) => ({ ...n, read: true })));
+      })
+      .catch((err) => console.warn("Failed to mark all read:", err));
   }
 
   function handleMarkRead(id: string) {
-    // TODO: call API then update state
-    setNotifications((prev) =>
-      (prev ?? []).map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    appNotificationsApi.markRead(Number(id))
+      .then(() => {
+        setNotifications((prev) => (prev ?? []).map((n) => (n.id === id ? { ...n, read: true } : n)));
+      })
+      .catch((err) => console.warn("Failed to mark read:", err));
   }
 
-  // Derive unread count from controlled state (falls back to mock count = 3)
-  const unreadCount = notifications ? notifications.filter((n) => !n.read).length : 3;
+  const unreadCount = notifications ? notifications.filter((n) => !n.read).length : 0;
 
   const { setMobileOpen } = useSidebar();
 
   const transKey = titleKeys[title];
   const translatedTitle = transKey ? t("app.admin." + transKey, title) : title;
 
+  const userName = user?.fullName || "Admin User";
+  const userEmail = user?.email || user?.phone || "admin@vibenests.com";
+  const avatarInitial = (userName.charAt(0) || "A").toUpperCase();
+
   return (
     <>
-      <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--gold)]/10 bg-[oklch(0.11_0.025_260)]">
+      <header className="flex items-center justify-between px-4 sm:px-6 h-[88px] border-b border-[var(--gold)]/10 bg-[oklch(0.11_0.025_260)] shrink-0">
         {/* Left: Page Title & Mobile Drawer toggle */}
         <div className="flex items-center gap-3">
           <button
@@ -115,29 +141,35 @@ export function AdminHeader({ title }: AdminHeaderProps) {
               onClick={() => setDropdownOpen((o) => !o)}
               className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--gold)]/20 hover:border-[var(--gold)]/50 transition"
             >
-              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[var(--gold)] to-[var(--gold-deep)] flex items-center justify-center text-xs font-bold text-[oklch(0.12_0.02_260)]">
-                A
+              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[var(--gold)] to-[var(--gold-deep)] flex items-center justify-center text-xs font-bold text-[oklch(0.12_0.02_260)] uppercase">
+                {avatarInitial}
               </div>
-              <span className="text-sm text-foreground hidden sm:block">Admin</span>
+              <span className="text-sm text-foreground hidden sm:block truncate max-w-[120px]">{userName}</span>
               <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-44 glass-card rounded-xl border border-[var(--gold)]/15 py-1 z-50">
+              <div className="absolute right-0 mt-2 w-52 glass-card rounded-xl border border-[var(--gold)]/15 py-1 z-50">
                 <div className="px-4 py-2 border-b border-white/[0.06]">
-                  <p className="text-xs font-medium text-foreground">{t("app.admin.adminUser", "Admin User")}</p>
-                  <p className="text-[11px] text-muted-foreground">admin@vibenests.com</p>
+                  <p className="text-xs font-medium text-foreground truncate">{userName}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{userEmail}</p>
                 </div>
-                <button className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition">
+                <button
+                  onClick={() => { setDropdownOpen(false); navigate("/settings"); }}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition cursor-pointer"
+                >
                   <User className="h-3.5 w-3.5" /> {t("app.admin.profile", "Profile")}
                 </button>
-                <button className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition">
+                <button
+                  onClick={() => { setDropdownOpen(false); navigate("/settings"); }}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition cursor-pointer"
+                >
                   <Settings className="h-3.5 w-3.5" /> {t("app.admin.settings", "Settings")}
                 </button>
                 <div className="h-px bg-white/[0.06] my-1" />
                 <button
                   onClick={() => { setDropdownOpen(false); setShowLogout(true); }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition cursor-pointer"
                 >
                   <LogOut className="h-3.5 w-3.5" /> {t("app.admin.logout", "Logout")}
                 </button>

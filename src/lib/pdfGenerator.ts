@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable';
 const getLogoImage = (): Promise<HTMLImageElement | null> => {
   return new Promise((resolve) => {
     const img = new Image();
-    img.src = '/logo.png';
+    img.src = '/image.png';
     img.crossOrigin = 'anonymous';
     const timeout = setTimeout(() => {
       resolve(null);
@@ -71,7 +71,7 @@ function drawBrandHeader(doc: jsPDF, logoImg: HTMLImageElement | null, titleText
 // Draw professional thank you message and copyright in footer
 function drawFooter(doc: jsPDF, pageNumber: number = 1) {
   const pageHeight = doc.internal.pageSize.height;
-  
+
   // Thin footer divider
   doc.setDrawColor(229, 231, 235);
   doc.setLineWidth(0.2);
@@ -97,7 +97,7 @@ export async function generateBookingInvoicePDF(booking: any, user: any, addonsL
 
   // Load formatting parameters
   const invoiceId = `INV-${booking.id || 'VN'}`;
-  const invoiceDate = booking.createdAt 
+  const invoiceDate = booking.createdAt
     ? new Date(booking.createdAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
     : new Date().toLocaleDateString();
   const statusStr = (booking.status || 'COMPLETED').toUpperCase();
@@ -143,17 +143,17 @@ export async function generateBookingInvoicePDF(booking: any, user: any, addonsL
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(31, 41, 55);
-  const suiteName = booking.suiteName || 
-                    (typeof booking.suite === 'string' ? booking.suite : booking.suite?.name) || 
-                    `Suite #${booking.suiteId || ''}`;
+  const suiteName = booking.suiteName ||
+    (typeof booking.suite === 'string' ? booking.suite : booking.suite?.name) ||
+    `Suite #${booking.suiteId || ''}`;
   doc.text(suiteName, 112, 56);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(75, 85, 99);
   doc.text(`Location: ${booking.location || booking.suite?.location || 'VibeNests Luxury, India'}`, 112, 62);
-  
-  const stayDate = booking.checkIn 
+
+  const stayDate = booking.checkIn
     ? new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
     : (booking.date ? new Date(booking.date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '—');
   doc.text(`Stay Date: ${stayDate}`, 112, 68);
@@ -223,11 +223,11 @@ export async function generateBookingInvoicePDF(booking: any, user: any, addonsL
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(75, 85, 99);
-  
-  const paymentModeText = paymentMode === 'pay_at_venue' 
-    ? 'Pay at Venue (20% Advance Online)' 
-    : paymentMode === 'package_credit' 
-      ? 'Package Credit' 
+
+  const paymentModeText = paymentMode === 'pay_at_venue'
+    ? 'Pay at Venue (20% Advance Online)'
+    : paymentMode === 'package_credit'
+      ? 'Package Credit'
       : 'Online Card/UPI';
   doc.text(`Method: ${paymentModeText}`, 14, leftY);
   leftY += 5;
@@ -325,7 +325,7 @@ export async function generateTransactionInvoicePDF(transaction: any, user: any)
 
   // Load parameters
   const receiptId = transaction.id || transaction.invoice || 'TXN-VN';
-  const receiptDate = transaction.date 
+  const receiptDate = transaction.date
     ? new Date(transaction.date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
     : new Date().toLocaleDateString();
   const statusStr = (transaction.status || 'COMPLETED').toUpperCase();
@@ -379,13 +379,13 @@ export async function generateTransactionInvoicePDF(transaction: any, user: any)
   doc.setFontSize(8.5);
   doc.setTextColor(75, 85, 99);
   doc.text(`Payment Method: ${transaction.method || 'Online Payment'}`, 112, 62);
-  
+
   if (booking) {
-    const suiteName = booking.suiteName || 
-                      (typeof booking.suite === 'string' ? booking.suite : booking.suite?.name) || 
-                      `Suite #${booking.suiteId || ''}`;
+    const suiteName = booking.suiteName ||
+      (typeof booking.suite === 'string' ? booking.suite : booking.suite?.name) ||
+      `Suite #${booking.suiteId || ''}`;
     doc.text(`Suite: ${suiteName}`, 112, 68);
-    const stayDate = booking.checkIn 
+    const stayDate = booking.checkIn
       ? new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
       : (booking.date ? new Date(booking.date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '—');
     doc.text(`Stay Date: ${stayDate}`, 112, 74);
@@ -399,7 +399,7 @@ export async function generateTransactionInvoicePDF(transaction: any, user: any)
   // 3. Items Table
   const tableData: any[][] = [];
   const transAmount = Math.abs(parseFloat(transaction.amount || 0));
-  
+
   let descText = `Payment for ${transaction.category || 'Service'}`;
   if (booking) {
     const suiteName = booking.suiteName || booking.suite?.name || 'Suite';
@@ -407,7 +407,7 @@ export async function generateTransactionInvoicePDF(transaction: any, user: any)
   } else if (transaction.desc) {
     descText = transaction.desc;
   }
-  
+
   tableData.push([descText, '1', `Rs. ${transAmount.toFixed(2)}`, `Rs. ${transAmount.toFixed(2)}`]);
 
   autoTable(doc, {

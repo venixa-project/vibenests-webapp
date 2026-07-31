@@ -311,7 +311,9 @@ export default function AdminRegisterPage() {
                       <div className="flex gap-2">
                         <span className="luxury-input rounded-xl px-3 py-2.5 text-sm text-muted-foreground shrink-0 flex items-center">+91</span>
                         <input
-                          type="tel" placeholder={t("app.auth.phonePlaceholder", "98765 43210")}
+                          type="tel"
+                          maxLength={10}
+                          placeholder={t("app.auth.phonePlaceholder", "98765 43210")}
                           value={form.phone}
                           onChange={(e) => set("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
                           className={`luxury-input flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 ${errors.phone ? "border-rose-500/50" : ""}`}

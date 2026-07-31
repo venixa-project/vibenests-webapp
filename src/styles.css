@@ -44,7 +44,8 @@
   --radius: 0.875rem;
 
   /* Brand palette */
-  --gold: oklch(0.78 0.13 80);          /* ~#D4A03C */
+  --gold: oklch(0.78 0.13 80);
+  /* ~#D4A03C */
   --gold-soft: oklch(0.86 0.10 85);
   --gold-deep: oklch(0.62 0.13 75);
   --navy: oklch(0.18 0.04 265);
@@ -81,8 +82,8 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   --gradient-bg: radial-gradient(1200px 600px at 80% -10%, oklch(0.25 0.06 260 / 0.55), transparent 60%),
-                 radial-gradient(900px 500px at -10% 30%, oklch(0.22 0.05 265 / 0.45), transparent 60%),
-                 linear-gradient(180deg, oklch(0.09 0.02 265) 0%, oklch(0.06 0.015 260) 100%);
+    radial-gradient(900px 500px at -10% 30%, oklch(0.22 0.05 265 / 0.45), transparent 60%),
+    linear-gradient(180deg, oklch(0.09 0.02 265) 0%, oklch(0.06 0.015 260) 100%);
   --gradient-gold: linear-gradient(135deg, oklch(0.86 0.11 85), oklch(0.7 0.14 70));
   --shadow-gold: 0 10px 40px -10px oklch(0.78 0.13 80 / 0.45);
   --shadow-luxe: 0 30px 80px -20px oklch(0 0 0 / 0.6), 0 2px 8px oklch(0 0 0 / 0.4);
@@ -96,6 +97,7 @@
     font-display: swap;
     src: url("https://fonts.gstatic.com/s/cormorantgaramond/v21/co3YmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2") format("woff2");
   }
+
   @font-face {
     font-family: "Cormorant Garamond";
     font-style: italic;
@@ -103,6 +105,7 @@
     font-display: swap;
     src: url("https://fonts.gstatic.com/s/cormorantgaramond/v21/co3WmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2") format("woff2");
   }
+
   @font-face {
     font-family: "Playfair Display";
     font-style: normal;
@@ -110,6 +113,7 @@
     font-display: swap;
     src: url("https://fonts.gstatic.com/s/playfairdisplay/v37/nuFiD-vYSZviVYUb_rj3ij__anPXBYf9pWBg.woff2") format("woff2");
   }
+
   @font-face {
     font-family: "Inter";
     font-style: normal;
@@ -118,7 +122,9 @@
     src: url("https://fonts.gstatic.com/s/inter/v19/UcCO3FwrK3iLTeHuS_nVMrMxCp50ojIa1ZL7.woff2") format("woff2");
   }
 
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
   }
 
@@ -126,7 +132,8 @@
     border-color: var(--color-border);
   }
 
-  html, body {
+  html,
+  body {
     margin: 0;
     padding: 0;
     width: 100%;
@@ -158,7 +165,10 @@
     height: auto;
   }
 
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     font-family: var(--font-display);
     letter-spacing: -0.01em;
   }
@@ -190,10 +200,21 @@
 }
 
 @layer utilities {
-  .text-gold { color: var(--gold); }
-  .bg-gold { background-color: var(--gold); }
-  .border-gold { border-color: var(--gold); }
-  .font-display { font-family: var(--font-display); }
+  .text-gold {
+    color: var(--gold);
+  }
+
+  .bg-gold {
+    background-color: var(--gold);
+  }
+
+  .border-gold {
+    border-color: var(--gold);
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
 
   .gold-gradient-text {
     background: linear-gradient(135deg, oklch(0.92 0.08 90), oklch(0.78 0.14 78), oklch(0.66 0.14 70));
@@ -231,6 +252,7 @@
     box-shadow: var(--shadow-gold);
     transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
   }
+
   .btn-gold:hover {
     transform: translateY(-1px);
     filter: brightness(1.05);
@@ -254,14 +276,17 @@
     color-scheme: dark;
     transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   }
+
   input.luxury-input {
     height: 42px;
   }
+
   .luxury-input:focus {
     background: rgb(18, 20, 40);
     border-color: oklch(0.78 0.13 80 / 0.7);
     box-shadow: 0 0 0 3px oklch(0.78 0.13 80 / 0.12);
   }
+
   .luxury-input:-webkit-autofill,
   .luxury-input:-webkit-autofill:hover,
   .luxury-input:-webkit-autofill:focus,
@@ -281,6 +306,7 @@
     box-shadow: var(--shadow-gold);
     transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
   }
+
   .gold-btn:hover {
     transform: translateY(-1px);
     filter: brightness(1.05);
@@ -292,6 +318,7 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
+
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
@@ -314,12 +341,13 @@
     width: 6px;
     height: 6px;
   }
+
   .custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
+
   .custom-scrollbar::-webkit-scrollbar-thumb {
     background-color: #000000;
     border-radius: 10px;
   }
 }
-

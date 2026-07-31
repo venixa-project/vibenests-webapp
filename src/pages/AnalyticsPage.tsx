@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
 
         // Fetch suite performance radar data
         const token = localStorage.getItem('accessToken');
-        const backendBase = window.location.origin.includes('localhost') ? 'http://localhost:4000' : 'https://api.vibenests.in';
+        const backendBase = import.meta.env.DEV ? 'http://localhost:5001' : 'https://api.vibenests.in';
         const perfRes = await fetch(`${backendBase}/reports/suite-performance?start=${startISO}&end=${endISO}`, {
           headers: {
             'Content-Type': 'application/json',

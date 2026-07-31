@@ -40,26 +40,26 @@ import { SuitesProvider } from "@/components/admin/SuitesContext";
 import RazorpayProvider from "@/components/shared/RazorpayProvider";
 
 import { AppDataProvider } from "@/components/admin/AppDataContext";
-import FloatingWhatsAppBot from "@/components/shared/FloatingWhatsAppBot";
+import AiAssistantBot from "@/components/shared/AiAssistantBot";
+import { Toaster } from "@/components/ui/sonner";
 
 function BotWrapper() {
   const location = useLocation();
-  const adminPaths = [
-    '/dashboard', '/revenue', '/bookings', '/suites', '/booking-details',
-    '/users', '/settings', '/addons', '/analytics', '/offers', '/packages',
-    '/celebration-memberships', '/customers', '/avg-booking-value', '/reviews',
-    '/transactions', '/refunds', '/admin', '/payments/razorpay-link', '/payments/razorpay-link-success'
+  // Hide the bot on auth and payment pages
+  const hiddenPaths = [
+    '/login', '/register', '/admin/register', '/forgot-password', '/reset-password', '/payments/razorpay-link', '/payments/razorpay-link-success'
   ];
-  const isAdmin = adminPaths.some(path => location.pathname.startsWith(path));
+  const isHidden = hiddenPaths.some(path => location.pathname.startsWith(path));
   
-  if (isAdmin) return null;
-  return <FloatingWhatsAppBot />;
+  if (isHidden) return null;
+  return <AiAssistantBot />;
 }
 
 export default function App() {
   return (
     <AppDataProvider>
       <RazorpayProvider>
+        <Toaster position="top-center" richColors />
         <BotWrapper />
         {/* AuthProvider validates session on app mount; protected routes must not redirect until that check completes. */}
         <Routes>

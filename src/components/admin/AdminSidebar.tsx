@@ -115,19 +115,31 @@ export function AdminSidebar() {
 
   // Keep subnav open state in sync when the route changes externally
   useEffect(() => {
+    let matched = false;
     navSections.forEach((section) => {
       const hasActiveChild = section.items.some((item) => location.pathname === item.to);
       if (hasActiveChild) {
-        setOpenSubnavs((prev) => ({ ...prev, [section.title]: true }));
+        setOpenSubnavs({ [section.title]: true });
+        matched = true;
       }
     });
+    if (!matched && location.pathname === '/dashboard') {
+      setOpenSubnavs({ "Overview": true });
+    }
   }, [location.pathname]);
 
   const toggleSubnav = (title: string) => {
-    setOpenSubnavs((prev) => ({
-      ...prev,
-      [title]: !prev[title],
-    }));
+    setOpenSubnavs((prev) => {
+      const isCurrentlyOpen = !!prev[title];
+      const updated: Record<string, boolean> = {};
+      navSections.forEach((s) => {
+        updated[s.title] = false;
+      });
+      if (!isCurrentlyOpen) {
+        updated[title] = true;
+      }
+      return updated;
+    });
   };
 
   return (
@@ -141,18 +153,18 @@ export function AdminSidebar() {
       )}
 
       <aside
-        className={`flex flex-col h-screen fixed lg:sticky top-0 bg-[oklch(0.11_0.025_260)] border-r border-[var(--gold)]/10 transition-all duration-300 z-50
+        className={`flex flex-col h-full shrink-0 fixed lg:sticky top-0 bg-[oklch(0.11_0.025_260)] border-r border-[var(--gold)]/10 transition-all duration-300 z-50
           ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
           ${collapsed ? "lg:w-16" : "lg:w-64"} w-64`}
       >
         {/* Brand + Toggle */}
-        <div className="flex items-center justify-between px-3 py-4 border-b border-[var(--gold)]/10 min-h-[64px]">
+        <div className="flex items-center justify-between px-3 h-[88px] border-b border-[var(--gold)]/10 shrink-0">
           {(!collapsed || mobileOpen) && (
-            <div className="flex items-center gap-3 overflow-hidden">
-              <LogoPopover className="h-16 w-16 object-contain shrink-0" />
+            <div className="flex items-center gap-2">
+              <img src="/image.png" alt="VibeNests" className="h-[72px] w-[72px] object-contain shrink-0" />
               <div className="leading-tight">
-                <div className="font-display text-xs font-semibold tracking-[0.15em] text-gradient-gold">VIBENESTS</div>
-                <div className="text-[9px] tracking-widest text-muted-foreground uppercase">{t("app.admin.adminPanel", "Admin Panel")}</div>
+                <div className="font-display text-xl font-semibold tracking-wide text-gradient-gold">VIBENESTS</div>
+                <div className="text-[10px] tracking-widest text-muted-foreground uppercase">{t("app.admin.adminPanel", "Admin Panel")}</div>
               </div>
             </div>
           )}
@@ -183,11 +195,10 @@ export function AdminSidebar() {
               return (
                 <div key={section.title} className="relative group flex justify-center py-1">
                   <button
-                    className={`h-10 w-10 flex items-center justify-center rounded-xl transition-all cursor-pointer ${
-                      hasActiveChild
-                        ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
-                    }`}
+                    className={`h-10 w-10 flex items-center justify-center rounded-xl transition-all cursor-pointer ${hasActiveChild
+                      ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
+                      }`}
                   >
                     <SectionIcon className="h-5 w-5 shrink-0" />
                   </button>
@@ -209,10 +220,9 @@ export function AdminSidebar() {
                             to={to}
                             onClick={() => setMobileOpen(false)}
                             className={({ isActive }) =>
-                              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all ${
-                                isActive
-                                  ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
+                              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all ${isActive
+                                ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20"
+                                : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
                               }`
                             }
                           >
@@ -235,25 +245,22 @@ export function AdminSidebar() {
                   className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-gold hover:bg-white/[0.03] transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <SectionIcon className={`h-4 w-4 shrink-0 transition-colors ${
-                      hasActiveChild ? "text-gold" : "text-muted-foreground/80 group-hover:text-gold"
-                    }`} />
+                    <SectionIcon className={`h-4 w-4 shrink-0 transition-colors ${hasActiveChild ? "text-gold" : "text-muted-foreground/80 group-hover:text-gold"
+                      }`} />
                     <span className={hasActiveChild ? "text-foreground font-medium" : ""}>
                       {t("app.admin.section." + section.title.toLowerCase().replace(/\s+/g, ""), section.title)}
                     </span>
                   </div>
                   <ChevronDown
-                    className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${
-                      isOpen ? "rotate-180 text-gold" : "text-muted-foreground/60"
-                    }`}
+                    className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180 text-gold" : "text-muted-foreground/60"
+                      }`}
                   />
                 </button>
 
                 {/* Sub-items list */}
                 <div
-                  className={`pl-4 border-l border-[var(--gold)]/10 ml-5 space-y-1 overflow-hidden transition-all duration-300 ${
-                    isOpen ? "max-h-[500px] opacity-100 py-1" : "max-h-0 opacity-0 py-0 pointer-events-none"
-                  }`}
+                  className={`pl-4 border-l border-[var(--gold)]/10 ml-5 space-y-1 overflow-hidden transition-all duration-300 ${isOpen ? "max-h-[500px] opacity-100 py-1" : "max-h-0 opacity-0 py-0 pointer-events-none"
+                    }`}
                 >
                   {section.items.map(({ icon: Icon, label, to }) => {
                     const transKey = navItemKeys[label];
@@ -264,10 +271,9 @@ export function AdminSidebar() {
                         to={to}
                         onClick={() => setMobileOpen(false)}
                         className={({ isActive }) =>
-                          `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
-                            isActive
-                              ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20"
-                              : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
+                          `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${isActive
+                            ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20"
+                            : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
                           }`
                         }
                       >

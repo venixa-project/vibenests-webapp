@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, CalendarDays, Clock, History, Wallet, Award,
-  Tag, UserCircle, HelpCircle, LogOut, BedDouble,
+  Tag, UserCircle, User, HelpCircle, LogOut, BedDouble,
   MapPin, ChevronRight, Star, CreditCard, Phone, MessageSquare,
   ArrowUpRight, CheckCircle2, XCircle, Hourglass, Bell,
   Users, Wifi, Tv, Wind, Music, Camera, Coffee, Cake, Sparkles,
@@ -13,7 +13,7 @@ import {
   X, Download, AlertTriangle, Receipt, Package, Plus, Edit3, Trash2,
 } from "lucide-react";
 import { useSuitesContext } from "@/components/admin/SuitesContext";
-import { bookingsApi, membershipsApi, usersApi, paymentsApi, offersApi, couponsApi, refundsApi, referralsApi } from "@/lib/api";
+import { bookingsApi, membershipsApi, usersApi, paymentsApi, offersApi, couponsApi, refundsApi, referralsApi, appNotificationsApi } from "@/lib/api";
 import { NotificationPanel, type Notification } from "@/components/admin/NotificationPanel";
 import { LanguageSelector } from "@/components/shared/LanguageSelector";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -426,9 +426,9 @@ function RequestCancellationModal({ bookingId, onClose, onSuccess }: { bookingId
                     <div>
                       <p className="font-semibold mb-0.5">Not Refund Eligible</p>
                       <p className="leading-relaxed">
-                        {breakdown.tier === 'Package Booking - Not Eligible for Refund' 
-                            ? "Package bookings are non-refundable and credits will not be restored upon cancellation."
-                            : "This request will be automatically rejected. Events commencing in less than 24 hours do not qualify for refunds under the VibeNests terms."}
+                        {breakdown.tier === 'Package Booking - Not Eligible for Refund'
+                          ? "Package bookings are non-refundable and credits will not be restored upon cancellation."
+                          : "This request will be automatically rejected. Events commencing in less than 24 hours do not qualify for refunds under the VibeNests terms."}
                       </p>
                     </div>
                   </div>
@@ -1405,6 +1405,17 @@ function DashboardView({ onNavigate, referralStats, refreshReferrals }: { onNavi
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { suites } = useSuitesContext();
+
+  function handleStartBooking(state?: any) {
+    const authUserRaw = localStorage.getItem("authUser");
+    const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+    const isGuest = !authUser || !authUser.id || authUser.fullName === "New Guest" || authUser.fullName === "Guest" || !authUser.email || authUser.email?.endsWith("@phone.local");
+    if (isGuest) {
+      navigate("/register", { state: { fromBooking: true, suiteId: state?.suiteId } });
+      return;
+    }
+    navigate("/user/suite-booking", { state });
+  }
   const activeSuites = suites.filter((s) => s.status === "Active");
   const upcomingSuites = suites.filter((s) => s.status === "Inactive");
   const [dashboardSelected, setDashboardSelected] = useState<Booking | null>(null);
@@ -1542,7 +1553,7 @@ function DashboardView({ onNavigate, referralStats, refreshReferrals }: { onNavi
             </span>
           </div>
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {activeSuites.map((s, i) => <SuiteCard key={s.id} suite={s} index={i} onBookNow={() => navigate("/user/suite-booking", { state: { suiteId: s.id } })} />)}
+            {activeSuites.map((s, i) => <SuiteCard key={s.id} suite={s} index={i} onBookNow={() => handleStartBooking({ suiteId: s.id })} />)}
           </div>
         </div>
       )}
@@ -1554,7 +1565,7 @@ function DashboardView({ onNavigate, referralStats, refreshReferrals }: { onNavi
             <span className="px-2.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[10px] font-bold">{t("app.userDashboard.comingSoon", "Coming Soon")}</span>
           </div>
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {upcomingSuites.map((s, i) => <SuiteCard key={s.id} suite={s} index={i} onBookNow={() => navigate("/user/suite-booking", { state: { suiteId: s.id } })} />)}
+            {upcomingSuites.map((s, i) => <SuiteCard key={s.id} suite={s} index={i} onBookNow={() => handleStartBooking({ suiteId: s.id })} />)}
           </div>
         </div>
       )}
@@ -1599,6 +1610,18 @@ function SuitesView() {
   const { suites } = useSuitesContext();
   const navigate = useNavigate();
   const { t } = useTranslation();
+
+  function handleStartBooking(state?: any) {
+    const authUserRaw = localStorage.getItem("authUser");
+    const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+    const isGuest = !authUser || !authUser.id || authUser.fullName === "New Guest" || authUser.fullName === "Guest" || !authUser.email || authUser.email?.endsWith("@phone.local");
+    if (isGuest) {
+      navigate("/register", { state: { fromBooking: true } });
+      return;
+    }
+    navigate("/user/suite-booking", { state });
+  }
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const filtered = suites.filter((s) => {
@@ -1638,7 +1661,7 @@ function SuitesView() {
         <div className="glass-card rounded-2xl p-16 text-center text-muted-foreground text-sm">{t("app.userDashboard.noSuitesFound", "No suites found.")}</div>
       ) : (
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((s, i) => <SuiteCard key={s.id} suite={s} index={i} onBookNow={() => navigate("/user/suite-booking", { state: { suiteId: s.id } })} />)}
+          {filtered.map((s, i) => <SuiteCard key={s.id} suite={s} index={i} onBookNow={() => handleStartBooking({ suiteId: s.id })} />)}
         </div>
       )}
     </div>
@@ -2348,6 +2371,17 @@ function CelebrationMembershipsView() {
   const { t } = useTranslation();
   const { suites } = useSuitesContext();
   const navigate = useNavigate();
+
+  function handleStartBooking(state?: any) {
+    const authUserRaw = localStorage.getItem("authUser");
+    const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+    const isGuest = !authUser || !authUser.id || authUser.fullName === "New Guest" || authUser.fullName === "Guest" || !authUser.email || authUser.email?.endsWith("@phone.local");
+    if (isGuest) {
+      navigate("/register", { state: { fromBooking: true } });
+      return;
+    }
+    navigate("/user/suite-booking", { state });
+  }
   const [plans, setPlans] = useState<any[]>([]);
   const [myActive, setMyActive] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -2591,7 +2625,7 @@ function CelebrationMembershipsView() {
                   if (!myActive) {
                     return (
                       <button
-                        onClick={() => navigate("/user/suite-booking", { state: { package: plan, isMembershipPurchase: true } })}
+                        onClick={() => handleStartBooking({ package: plan, isMembershipPurchase: true })}
                         className="gold-btn w-full rounded-2xl py-3 text-xs font-bold uppercase tracking-wider"
                       >
                         Buy Now
@@ -2603,7 +2637,7 @@ function CelebrationMembershipsView() {
                     if (isExpired) {
                       return (
                         <button
-                          onClick={() => navigate("/user/suite-booking", { state: { package: plan, isMembershipPurchase: true } })}
+                          onClick={() => handleStartBooking({ package: plan, isMembershipPurchase: true })}
                           className="gold-btn w-full rounded-2xl py-3 text-xs font-bold uppercase tracking-wider"
                         >
                           Renew Now
@@ -2625,7 +2659,7 @@ function CelebrationMembershipsView() {
                   if (planPrice > currentPrice) {
                     return (
                       <button
-                        onClick={() => navigate("/user/suite-booking", { state: { package: plan, isMembershipPurchase: true } })}
+                        onClick={() => handleStartBooking({ package: plan, isMembershipPurchase: true })}
                         className="gold-btn w-full rounded-2xl py-3 text-xs font-extrabold uppercase tracking-wider bg-gradient-to-r from-amber-500 to-gold text-black hover:from-amber-600 hover:to-gold/90 shadow-lg border border-gold"
                       >
                         Upgrade Now
@@ -2893,32 +2927,31 @@ function ProfileView({ referralStats, refreshReferrals }: { referralStats: any; 
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      const isPl = !user.email || user.email.endsWith('@phone.local');
-      setForm({
-        fullName: user.fullName === 'New Guest' ? '' : (user.fullName || ''),
-        email: isPl ? '' : (user.email || ''),
-        phone: user.phone || '',
-        dateOfBirth: toDateInputValue((user as any).dateOfBirth) || '',
-        marriageDate: toDateInputValue((user as any)?.marriageDate) || '',
-      });
-    } else {
-      setLoading(true);
-      usersApi.me()
-        .then((u: any) => {
-          const isPl = !u.email || u.email.endsWith('@phone.local');
+    usersApi.getMe()
+      .then((u: any) => {
+        const isPl = !u.email || u.email.endsWith('@phone.local');
+        setForm({
+          fullName: u.fullName === 'New Guest' ? '' : (u.fullName || ''),
+          email: isPl ? '' : (u.email || ''),
+          phone: u.phone || '',
+          dateOfBirth: toDateInputValue(u.dateOfBirth) || '',
+          marriageDate: toDateInputValue(u.marriageDate) || '',
+        });
+      })
+      .catch((err) => {
+        console.error(err);
+        if (user) {
+          const isPl = !user.email || user.email.endsWith('@phone.local');
           setForm({
-            fullName: u.fullName === 'New Guest' ? '' : (u.fullName || ''),
-            email: isPl ? '' : (u.email || ''),
-            phone: u.phone || '',
-            dateOfBirth: toDateInputValue(u.dateOfBirth) || '',
-            marriageDate: toDateInputValue(u.marriageDate) || '',
+            fullName: user.fullName === 'New Guest' ? '' : (user.fullName || ''),
+            email: isPl ? '' : (user.email || ''),
+            phone: user.phone || '',
+            dateOfBirth: toDateInputValue((user as any).dateOfBirth) || '',
+            marriageDate: toDateInputValue((user as any)?.marriageDate) || '',
           });
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
-    }
-  }, [user]);
+        }
+      });
+  }, []);
 
   async function handleSave() {
     if (!form.fullName.trim()) {
@@ -3149,16 +3182,7 @@ export default function UserDashboardPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [referralStats, setReferralStats] = useState<any>(null);
-  const isProfileIncomplete = user?.fullName === 'New Guest' || !user?.email || user?.email?.endsWith('@phone.local');
-  const [activeNav, setActiveNav] = useState(isProfileIncomplete ? "profile" : "dashboard");
-
-  useEffect(() => {
-    if (isProfileIncomplete) {
-      setActiveNav("profile");
-    } else if (activeNav === "profile" && user?.fullName !== 'New Guest' && user?.email && !user?.email?.endsWith('@phone.local')) {
-      setActiveNav("dashboard");
-    }
-  }, [isProfileIncomplete, user?.fullName, user?.email]);
+  const [activeNav, setActiveNav] = useState("dashboard");
 
   useEffect(() => {
     if (!user?.id) return;
@@ -3175,9 +3199,10 @@ export default function UserDashboardPage() {
       console.error(err);
     }
   }
-  const displayName = user?.fullName || t("app.userDashboard.welcome_back_name", "Guest");
-  const displayLetter = displayName ? displayName.charAt(0).toUpperCase() : "U";
-  const displayEmail = user?.email || "";
+  const isGuestUser = !user || !user.fullName || user.fullName === 'New Guest' || user.fullName === 'Guest' || !user.email || user.email.endsWith('@phone.local');
+  const displayName = isGuestUser ? "Guest" : (user?.fullName || "Guest");
+  const displayLetter = (displayName || "G").charAt(0).toUpperCase();
+  const displayEmail = isGuestUser ? "Guest Visitor" : (user?.email || "");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -3185,23 +3210,26 @@ export default function UserDashboardPage() {
   const [reviewPromptBooking, setReviewPromptBooking] = useState<any | null>(null);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [readNotifIds, setReadNotifIds] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(`vibenests_read_notifs_${user?.id}`);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
 
   useEffect(() => {
     if (!user?.id) return;
+    appNotificationsApi.getMine()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setNotifications(data.map((n: any) => ({
+            id: String(n.id),
+            type: (n.type as any) || "system",
+            title: n.title,
+            message: n.message,
+            time: n.createdAt ? new Date(n.createdAt).toISOString() : new Date().toISOString(),
+            read: Boolean(n.isRead),
+          })));
+        }
+      })
+      .catch((err) => console.warn("Failed to fetch user notifications:", err));
+
     bookingsApi.getAll()
       .then((rawList) => {
-        const generated = generateNotifications(rawList, readNotifIds);
-        setNotifications(generated);
-
-        // Find completed booking for review prompt
         const completedBooking = rawList.find((b: any) =>
           b.status === 'completed' &&
           localStorage.getItem(`vibenests_review_prompt_dismissed_${b.id}`) !== 'true'
@@ -3213,28 +3241,22 @@ export default function UserDashboardPage() {
       .catch((err) => {
         console.error("Failed to generate notifications from bookings", err);
       });
-  }, [user?.id, readNotifIds]);
+  }, [user?.id, notifOpen]);
 
   function handleMarkAllRead() {
-    const allIds = notifications.map((n) => n.id);
-    setReadNotifIds(allIds);
-    try {
-      localStorage.setItem(`vibenests_read_notifs_${user?.id}`, JSON.stringify(allIds));
-    } catch (e) {
-      console.warn(e);
-    }
+    appNotificationsApi.markAllRead()
+      .then(() => {
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      })
+      .catch((err) => console.warn("Failed to mark all read:", err));
   }
 
   function handleMarkRead(id: string) {
-    setReadNotifIds((prev) => {
-      const next = prev.includes(id) ? prev : [...prev, id];
-      try {
-        localStorage.setItem(`vibenests_read_notifs_${user?.id}`, JSON.stringify(next));
-      } catch (e) {
-        console.warn(e);
-      }
-      return next;
-    });
+    appNotificationsApi.markRead(Number(id))
+      .then(() => {
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      })
+      .catch((err) => console.warn("Failed to mark read:", err));
 
     const notif = notifications.find((n) => n.id === id);
     if (notif?.link) {
@@ -3279,7 +3301,7 @@ export default function UserDashboardPage() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--background)]">
       {/* Top bar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-white/5 glass backdrop-blur-xl">
+      <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 h-[88px] border-b border-white/5 glass backdrop-blur-xl shrink-0">
         <div className="flex items-center gap-4">
           {/* Mobile toggle */}
           <button onClick={() => setSidebarOpen((o) => !o)}
@@ -3295,13 +3317,13 @@ export default function UserDashboardPage() {
             aria-label="Toggle sidebar">
             <Menu className="h-4 w-4" />
           </button>
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 shrink-0 rounded-lg overflow-hidden">
-              <img src="/logo.png" alt="VibeNests" className="h-full w-full object-contain" />
+          <div className="flex items-center gap-2">
+            <div className="h-[72px] w-[72px] shrink-0 rounded-lg">
+              <img src="/image.png" alt="VibeNests" className="h-full w-full object-contain" />
             </div>
             <div className="leading-tight">
-              <p className="font-display text-sm font-semibold tracking-[0.15em] text-gradient-gold">VIBENESTS</p>
-              <p className="text-[9px] tracking-[0.25em] text-muted-foreground uppercase">{t("app.userDashboard.brandSub", "Private Luxury Suites")}</p>
+              <p className="font-display text-2xl font-semibold tracking-wide text-gradient-gold">VIBENESTS</p>
+              <p className="text-[10px] tracking-widest text-muted-foreground uppercase">{t("app.userDashboard.brandSub", "Private Luxury Suites")}</p>
             </div>
           </div>
         </div>
@@ -3341,20 +3363,24 @@ export default function UserDashboardPage() {
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-11 z-50 w-44 glass-card rounded-xl border border-white/10 py-1 shadow-xl"
+                    className="absolute right-0 top-11 z-50 w-52 glass-card rounded-xl border border-white/10 py-1 shadow-xl"
                   >
+                    <div className="px-4 py-2 border-b border-white/[0.06]">
+                      <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{displayEmail || user?.phone || ''}</p>
+                    </div>
+                    <button
+                      onClick={() => { setActiveNav("profile"); setProfileOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <User className="h-4 w-4 shrink-0" /> {t("app.admin.profile", "Profile")}
+                    </button>
                     <button
                       onClick={() => { navigate("/login"); setProfileOpen(false); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    >
                       <LogOut className="h-4 w-4 shrink-0" /> {t("app.userDashboard.logout", "Logout")}
                     </button>
-                    {!isProfileIncomplete && (
-                      <button
-                        onClick={() => setProfileOpen(false)}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
-                        <X className="h-4 w-4 shrink-0" /> {t("app.userDashboard.cancel", "Cancel")}
-                      </button>
-                    )}
                   </motion.div>
                 </>
               )}
@@ -3416,13 +3442,11 @@ export default function UserDashboardPage() {
                                       id === "write-review" ? t("app.userDashboard.writeReview", "Write a Review") :
                                         label;
 
-              const isDisabled = isProfileIncomplete && id !== "profile";
+              const isDisabled = false;
               return (
                 <button key={id}
-                  disabled={isDisabled}
-                  title={sidebarCollapsed ? translatedLabel : (isDisabled ? "Please complete profile setup first" : undefined)}
+                  title={sidebarCollapsed ? translatedLabel : undefined}
                   onClick={() => {
-                    if (isDisabled) return;
                     if (id === "write-review") { navigate("/user/write-review"); setSidebarOpen(false); return; }
                     setActiveNav(id); setSidebarOpen(false);
                   }}

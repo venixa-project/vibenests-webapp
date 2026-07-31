@@ -1,6 +1,7 @@
 import i18n from '../i18n';
 
-const BASE = 'https://api.vibenests.in';
+export const BASE_URL = import.meta.env.DEV ? 'http://localhost:5001' : 'https://api.vibenests.in';
+const BASE = BASE_URL;
 
 function getToken() {
   return localStorage.getItem('accessToken');
@@ -15,7 +16,7 @@ let apiRefreshPromise: Promise<string | null> | null = null;
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
-  
+
   if (!apiRefreshPromise) {
     apiRefreshPromise = (async () => {
       try {
@@ -41,7 +42,7 @@ async function refreshAccessToken(): Promise<string | null> {
       }
     })();
   }
-  
+
   return apiRefreshPromise;
 }
 
@@ -85,13 +86,19 @@ export const authApi = {
       body: JSON.stringify({ email }),
     }),
   sendOtp: (phone: string) =>
-    request<{ message: string; otp?: string }>('/auth/otp/send', { method: 'POST', body: JSON.stringify({ phone }) }),
+    request<{ message: string; channel?: string; otp?: string }>('/auth/otp/send', { method: 'POST', body: JSON.stringify({ phone }) }),
+  sendEmailOtp: (email: string) =>
+    request<{ message: string; channel?: string; otp?: string }>('/auth/otp/send', { method: 'POST', body: JSON.stringify({ email }) }),
   verifyOtp: (phone: string, otp: string) =>
     request<{ accessToken: string; refreshToken: string; user: { id: number; email: string; role: string; phone?: string } }>(
       '/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone, otp }) }
     ),
+  verifyEmailOtp: (email: string, otp: string) =>
+    request<{ accessToken: string; refreshToken: string; user: { id: number; email: string; role: string; phone?: string } }>(
+      '/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }
+    ),
   register: (body: any) =>
-    request<{ id: number; email: string; role: string }>('/auth/register', {
+    request<{ accessToken: string; refreshToken: string; user: { id: number; email: string; role: string; fullName?: string } }>('/auth/register', {
       method: 'POST', body: JSON.stringify(body),
     }),
   logout: (refreshToken: string) =>
@@ -153,7 +160,8 @@ export const addonsApi = {
 export const usersApi = {
   getAll: () => request<any[]>('/users'),
   me: () => request<any>('/users/me'),
-  updateMe: (body: { fullName?: string; phone?: string; dateOfBirth?: string; marriageDate?: string }) => request<any>('/users/me', { method: 'PATCH', body: JSON.stringify(body) }),
+  getMe: () => request<{ id: number; fullName: string; email: string; phone: string; role: string; dateOfBirth?: string; marriageDate?: string }>('/users/me'),
+  updateMe: (body: { fullName?: string; email?: string; phone?: string; dateOfBirth?: string; marriageDate?: string }) => request<any>('/users/me', { method: 'PATCH', body: JSON.stringify(body) }),
   getById: (id: string) => request<any>(`/users/${id}`),
   create: (body: { fullName: string; email: string; phone?: string }) =>
     request<any>('/users', { method: 'POST', body: JSON.stringify(body) }),
@@ -176,10 +184,12 @@ export const paymentsApi = {
   getAll: () => request<any[]>('/payments/all'),
   getMine: () => request<any[]>('/payments/me'),
   createOrder: (bookingId: number, amount: number, method: string) =>
-    request<{ paymentId: number; orderId: string; amount: number; keyId: string }>(
+    request<{ paymentId: number; orderId: string; amount: number; keyId: string; devMode?: boolean }>(
       '/payments/create-order',
       { method: 'POST', body: JSON.stringify({ bookingId, amount, method }) }
     ),
+  verify: (body: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+    request<any>('/payments/verify', { method: 'POST', body: JSON.stringify(body) }),
   verifyPayment: (paymentId: number, razorpayOrderId: string, razorpayPaymentId: string, razorpaySignature: string) =>
     request<{ success: boolean; payment: any }>(
       '/payments/verify-payment',
@@ -260,6 +270,12 @@ export const liveCelebrationSettingsApi = {
   getMap: () => request<Record<string, string>>('/live-celebration-settings/map'),
   upsert: (body: { settingKey: string; settingValue: string; valueType?: string; label?: string; description?: string }) =>
     request<any>('/live-celebration-settings', { method: 'POST', body: JSON.stringify(body) }),
+};
+
+export const appNotificationsApi = {
+  getMine: () => request<any[]>('/app-notifications/my'),
+  markRead: (id: number) => request<any>(`/app-notifications/${id}/read`, { method: 'PATCH' }),
+  markAllRead: () => request<any>('/app-notifications/mark-all-read', { method: 'PATCH' }),
 };
 
 export const reviewsApi = {

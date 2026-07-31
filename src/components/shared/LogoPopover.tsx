@@ -7,7 +7,7 @@ interface LogoPopoverProps {
 
 const POPUP_SIZE = 176; // h-44 w-44 = 176px + padding
 
-export function LogoPopover({ className = "h-14 w-auto" }: LogoPopoverProps) {
+export function LogoPopover({ className = "h-20 w-auto" }: LogoPopoverProps) {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
 
@@ -35,7 +35,7 @@ export function LogoPopover({ className = "h-14 w-auto" }: LogoPopoverProps) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShow(false)}
     >
-      <img src="/logo.png" alt="VibeNests Logo" className={className} />
+      <img src="/image.png" alt="VibeNests Logo" className={className} />
 
       {show && createPortal(
         <div
@@ -43,7 +43,7 @@ export function LogoPopover({ className = "h-14 w-auto" }: LogoPopoverProps) {
           style={{ left: pos.x, top: pos.y }}
         >
           <div className="glass-card rounded-2xl border border-[var(--gold)]/25 p-3 shadow-2xl">
-            <img src="/logo.png" alt="VibeNests Logo" className="h-44 w-44 object-contain" />
+            <img src="/image.png" alt="VibeNests Logo" className="h-44 w-44 object-contain" />
           </div>
         </div>,
         document.body

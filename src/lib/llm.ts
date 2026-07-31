@@ -1,4 +1,5 @@
-const BASE = 'https://api.vibenests.in';
+import { BASE_URL } from './api';
+const BASE = BASE_URL;
 
 function getContext(): any {
   // Keep it minimal; no tokens.
@@ -14,11 +15,11 @@ function getContext(): any {
   }
 }
 
-export async function chatAnswer(message: string): Promise<string> {
+export async function chatAnswer(message: string, history: { role: 'user'|'assistant'; content: string }[] = []): Promise<string> {
   const res = await fetch(`${BASE}/llm/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, context: getContext() }),
+    body: JSON.stringify({ message, history, context: getContext() }),
   });
 
   const data = await res.json().catch(() => ({}));

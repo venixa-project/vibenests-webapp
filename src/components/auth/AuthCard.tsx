@@ -29,22 +29,11 @@ className="glass-card relative w-full max-w-md rounded-3xl p-7 sm:p-9"
           <h2 className="font-display text-3xl sm:text-4xl font-medium text-foreground">
             {t("app.auth.welcomeBack", "Welcome Back!")}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">{t("app.auth.loginDesc")}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("app.auth.loginDesc", "Sign in securely via WhatsApp or Email OTP")}</p>
         </div>
-
-        {/* <div className="px-4 py-4 mb-5"> */}
-          {/* <button */}
-            {/* type="button" */}
-            {/* className="w-full flex items-center justify-center gap-3 rounded-lg border border-[var(--gold)]/30 bg-white/[0.03] py-3 text-sm font-medium text-foreground hover:bg-white/[0.07] hover:border-[var(--gold)]/60 transition-all" */}
-          {/* // > */}
-            {/* <GoogleIcon className="h-5 w-5" /> */}
-            {/* {t("app.auth.google")} */}
-          {/* </button> */}
-        {/* {/* </div> */}
 
         <div className="my-5 flex items-center gap-3 text-[11px] tracking-[0.3em] text-muted-foreground uppercase">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[var(--gold)]/30" />
-          {/* <span>{t("app.auth.or")}</span> */}
           <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[var(--gold)]/30" />
         </div>
 
@@ -61,7 +50,7 @@ className="glass-card relative w-full max-w-md rounded-3xl p-7 sm:p-9"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tVal === "email" ? t("app.auth.emailLogin") : t("app.auth.otpLogin")}
+                {tVal === "email" ? t("app.auth.emailOtpLogin", "Email OTP") : t("app.auth.whatsappOtpLogin", "WhatsApp OTP")}
               </button>
             ))}
           </div>

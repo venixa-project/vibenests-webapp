@@ -23,7 +23,7 @@ export default function RazorpayPaymentLinkSuccessPage() {
       }
 
       try {
-        const apiBase = process.env.VITE_API_BASE || 'https://api.vibenests.in';
+        const apiBase = import.meta.env.DEV ? 'http://localhost:5001' : 'https://api.vibenests.in';
         const res = await fetch(`${apiBase}/payments-links-public/payments/link-callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

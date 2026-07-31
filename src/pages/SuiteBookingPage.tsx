@@ -105,8 +105,9 @@ export default function SuiteBookingPage() {
   const location = useLocation();
   const { t } = useTranslation();
   const { user } = useAuth();
-  const displayName = user?.fullName || t("app.userDashboard.welcome_back_name", "Guest");
-  const displayLetter = displayName ? displayName.charAt(0).toUpperCase() : "U";
+  const isGuestUser = !user || !user.fullName || user.fullName === 'New Guest' || user.fullName === 'Guest' || !user.email || user.email.endsWith('@phone.local');
+  const displayName = isGuestUser ? "Guest" : (user?.fullName || "Guest");
+  const displayLetter = (displayName || "G").charAt(0).toUpperCase();
   const { suites, loading: suitesLoading } = useSuitesContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -349,20 +350,6 @@ export default function SuiteBookingPage() {
   }, [selectedSuite, suites, passedPackage]);
 
   const slotDuration = suite?.slotDurationMins ?? 150;
-
-  if (suitesLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-[oklch(0.08_0.015_260)]">
-        <div className="glass-card rounded-3xl border border-gold/20 p-8 text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">{t("app.userDashboard.loadingSuites", "Loading suites...")}</p>
-          <div className="mt-4 h-2 w-56 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full w-1/3 bg-gold/70 animate-[bb_sweep_1s_ease-in-out_infinite]" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const slotGap = suite?.gapBetweenSlotsMins ?? 30;
   const timeSlots = suite
     ? generateSlots(suite.slotStartTime, suite.slotEndTime, slotDuration, slotGap)
@@ -532,6 +519,10 @@ export default function SuiteBookingPage() {
   function handleNext() {
     if (!isStepValid) { setShowValidation(true); return; }
     setShowValidation(false);
+    if (isGuestUser) {
+      navigate("/register", { state: { fromBooking: true, suiteId: suite?.id } });
+      return;
+    }
     step < STEPS.length - 1 ? setStep((v) => v + 1) : setConfirmed(true);
   }
   function handleBack() {
@@ -553,13 +544,13 @@ export default function SuiteBookingPage() {
   const Sidebar = (
     <aside className="flex flex-col h-full w-64 bg-[oklch(0.11_0.025_260)] border-r border-gold/10">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-gold/10">
-        <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
-          <img src="/logo.png" alt="VibeNests" className="h-full w-full object-contain" />
+      <div className="flex items-center gap-2 px-3 h-[88px] border-b border-gold/10 shrink-0">
+        <div className="h-[72px] w-[72px] rounded-lg shrink-0">
+          <img src="/image.png" alt="VibeNests" className="h-full w-full object-contain" />
         </div>
         <div className="leading-tight">
-          <p className="font-display text-xs font-semibold tracking-[0.15em] text-gradient-gold">VIBENESTS</p>
-          <p className="text-[9px] tracking-[0.25em] text-muted-foreground uppercase">Private Luxury Suites</p>
+          <p className="font-display text-xl font-semibold tracking-wide text-gradient-gold">VIBENESTS</p>
+          <p className="text-[9px] tracking-widest text-muted-foreground uppercase">Private Luxury Suites</p>
         </div>
       </div>
 
@@ -592,6 +583,19 @@ export default function SuiteBookingPage() {
       </div>
     </aside>
   );
+
+  if (suitesLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[oklch(0.08_0.015_260)]">
+        <div className="glass-card rounded-3xl border border-gold/20 p-8 text-center">
+          <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">{t("app.userDashboard.loadingSuites", "Loading suites...")}</p>
+          <div className="mt-4 h-2 w-56 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full w-1/3 bg-gold/70 animate-[bb_sweep_1s_ease-in-out_infinite]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /* ── Confirmed screen ── */
   if (confirmed) {
@@ -658,7 +662,7 @@ export default function SuiteBookingPage() {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
 
         {/* Top header */}
-        <header className="sticky top-0 z-20 flex items-center justify-between px-5 py-3.5 border-b border-white/5 glass backdrop-blur-xl shrink-0">
+        <header className="sticky top-0 z-20 flex items-center justify-between px-5 h-[88px] border-b border-white/5 glass backdrop-blur-xl shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen((o) => !o)}
@@ -909,10 +913,10 @@ export default function SuiteBookingPage() {
                                     }
                                   }}
                                   className={`flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border text-sm font-medium transition-all ${isBlocked
-                                      ? "border-white/5 bg-white/[0.01] text-muted-foreground/45 opacity-45 cursor-not-allowed"
-                                      : active
-                                        ? "border-gold bg-gold/15 text-gold shadow-[0_0_16px_rgba(212,160,60,0.2)]"
-                                        : "border-white/10 bg-white/5 text-muted-foreground hover:border-gold/40 hover:text-foreground hover:bg-white/10"
+                                    ? "border-white/5 bg-white/[0.01] text-muted-foreground/45 opacity-45 cursor-not-allowed"
+                                    : active
+                                      ? "border-gold bg-gold/15 text-gold shadow-[0_0_16px_rgba(212,160,60,0.2)]"
+                                      : "border-white/10 bg-white/5 text-muted-foreground hover:border-gold/40 hover:text-foreground hover:bg-white/10"
                                     }`}
                                 >
                                   <div className="flex items-center gap-2.5">
@@ -920,10 +924,10 @@ export default function SuiteBookingPage() {
                                     <span>{slot} – {end}</span>
                                   </div>
                                   <span className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${isBlocked
-                                      ? "border-rose-500/20 bg-rose-500/10 text-rose-400 font-semibold"
-                                      : active
-                                        ? "border-gold/40 bg-gold/10 text-gold"
-                                        : "border-white/10 bg-white/5 text-muted-foreground"
+                                    ? "border-rose-500/20 bg-rose-500/10 text-rose-400 font-semibold"
+                                    : active
+                                      ? "border-gold/40 bg-gold/10 text-gold"
+                                      : "border-white/10 bg-white/5 text-muted-foreground"
                                     }`}>
                                     {isBlocked ? "Already Booked" : `${slotDuration} min`}
                                   </span>
@@ -945,9 +949,9 @@ export default function SuiteBookingPage() {
                           </div>
                           <div className="flex flex-wrap gap-2 mt-1">
                             {startTimes.map(st => (
-                               <span key={st} className="text-xs bg-gold/15 text-gold border border-gold/30 px-2 py-1 rounded-full">
-                                  {st} – {getEndTime(st, slotDuration)}
-                               </span>
+                              <span key={st} className="text-xs bg-gold/15 text-gold border border-gold/30 px-2 py-1 rounded-full">
+                                {st} – {getEndTime(st, slotDuration)}
+                              </span>
                             ))}
                           </div>
                         </div>
@@ -1348,10 +1352,16 @@ export default function SuiteBookingPage() {
                             if (!suite || !selectedOccasion || !bookingDate || startTimes.length === 0) return;
                             try {
                               setPayError("");
-                              setPaying(true);
 
                               const authUserRaw = localStorage.getItem("authUser");
                               const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+                              const isGuestUser = !authUser || !authUser.id || authUser.fullName === "New Guest" || authUser.fullName === "Guest" || !authUser.email || authUser.email?.endsWith("@phone.local");
+                              if (isGuestUser) {
+                                navigate("/register", { state: { fromBooking: true, suiteId: suite?.id } });
+                                return;
+                              }
+
+                              setPaying(true);
                               const bookingPayload: any = {
                                 userId: Number(authUser?.id),
 
@@ -1381,6 +1391,18 @@ export default function SuiteBookingPage() {
                                 setPaying(false);
                               } else if (paymentMethod === "pay-now") {
                                 const createOrderRes = await paymentsApi.createOrder(Number(createdBookingId), payableNow, "razorpay");
+
+                                if ((createOrderRes as any)?.devMode) {
+                                  await paymentsApi.verifyPayment(
+                                    createOrderRes.paymentId,
+                                    createOrderRes.orderId,
+                                    `pay_dev_${Date.now()}`,
+                                    `sig_dev_${Date.now()}`
+                                  );
+                                  setConfirmed(true);
+                                  setPaying(false);
+                                  return;
+                                }
 
                                 const w = window as any;
                                 if (!createOrderRes?.keyId || !createOrderRes?.orderId) {
@@ -1424,7 +1446,7 @@ export default function SuiteBookingPage() {
                                   },
                                   theme: { color: "#b8972a" },
                                   modal: {
-                                    ondismiss: async function() {
+                                    ondismiss: async function () {
                                       try {
                                         await bookingsApi.cancel(Number(createdBookingId), { reason: "Payment aborted by user" });
                                       } catch (e) {
