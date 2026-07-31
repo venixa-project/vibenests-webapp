@@ -39,11 +39,11 @@ export function MobileOtpForm() {
     setLoading(true);
     const recipient = `${code}${mobile}`;
     try {
-      await authApi.sendOtp(recipient);
+      const res = await authApi.sendOtp(recipient);
       setOtp(Array(4).fill(""));
       setStage("otp");
       setTimer(30);
-      const msg = `OTP sent successfully to ${recipient}`;
+      const msg = res.otp ? `OTP sent: ${res.otp}` : `OTP sent successfully to ${recipient}`;
       setSuccessPopup(msg);
       setTimeout(() => setSuccessPopup(null), 3500);
       setTimeout(() => inputsRef.current[0]?.focus(), 50);
@@ -110,7 +110,7 @@ export function MobileOtpForm() {
       )}
 
       <div className="space-y-2">
-        <label className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("app.auth.mobileLabel", "Mobile WhatsApp Number")}</label>
+        <label className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("app.auth.mobileLabel", "Mobile Number")}</label>
         <div className="flex gap-2">
           <select
             value={code}

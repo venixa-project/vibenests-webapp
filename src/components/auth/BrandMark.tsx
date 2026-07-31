@@ -1,8 +1,10 @@
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
+
 export function BrandMark() {
   return (
     <div className="flex items-center gap-4">
       <div className="relative h-20 w-20 sm:h-24 sm:w-24 xl:h-28 xl:w-28 shrink-0">
-        <img src="/image.png" alt="VibeNests Logo" className="h-full w-full object-contain filter drop-shadow-md" />
+        <CompanyLogo alt="VibeNests Logo" className="h-full w-full object-contain filter drop-shadow-md" />
       </div>
       <div className="leading-tight">
         <div className="font-display text-4xl sm:text-5xl xl:text-6xl font-semibold tracking-wide text-gradient-gold">

@@ -13,6 +13,7 @@ import {
   X, Download, AlertTriangle, Receipt, Package, Plus, Edit3, Trash2,
 } from "lucide-react";
 import { useSuitesContext } from "@/components/admin/SuitesContext";
+import { toast } from "sonner";
 import { bookingsApi, membershipsApi, usersApi, paymentsApi, offersApi, couponsApi, refundsApi, referralsApi, appNotificationsApi } from "@/lib/api";
 import { NotificationPanel, type Notification } from "@/components/admin/NotificationPanel";
 import { LanguageSelector } from "@/components/shared/LanguageSelector";
@@ -257,7 +258,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "past", label: "Past Bookings", icon: History },
   { id: "wallet", label: "Payments", icon: Wallet },
   { id: "refunds", label: "Refunds", icon: RotateCcw },
-  { id: "memberships", label: "Celebration Packages", icon: Award },
+  // { id: "memberships", label: "Celebration Packages", icon: Award },
   { id: "offers", label: "Special Offers", icon: Tag },
   { id: "profile", label: "Profile Settings", icon: UserCircle },
   { id: "help", label: "Help & Support", icon: HelpCircle },
@@ -347,11 +348,11 @@ function RequestCancellationModal({ bookingId, onClose, onSuccess }: { bookingId
       setError("");
       const res = await refundsApi.initiate(bookingId, category, comments);
       if (res.status === "approved" || res.status === "refunded" || res.status === "processing") {
-        alert("Your refund request has been processed successfully.");
+        toast.success("Your refund request has been processed successfully.");
       } else if (res.status === "rejected") {
-        alert(`Refund Request Auto-Rejected\nReason: ${res.refundReason || res.rejectionReason || "Not eligible under current policy."}`);
+        toast.error(`Refund Request Auto-Rejected: ${res.refundReason || res.rejectionReason || "Not eligible under current policy."}`);
       } else {
-        alert(`Refund request submitted successfully! Status: ${res.status}`);
+        toast.info(`Refund request submitted successfully! Status: ${res.status}`);
       }
       onSuccess();
       onClose();
@@ -574,7 +575,7 @@ function BookingDetailsDrawer({ booking, onClose }: { booking: Booking; onClose:
             if (resp?.success) {
               const updated = await bookingsApi.getById(rawId);
               setDetails(updated);
-              alert("Payment successful! The balance amount has been paid.");
+              toast.success("Payment successful! The balance amount has been paid.");
             } else {
               throw new Error("Payment verification failed");
             }
@@ -610,7 +611,7 @@ function BookingDetailsDrawer({ booking, onClose }: { booking: Booking; onClose:
       if (resp?.success || resp?.booking) {
         const updated = await bookingsApi.getById(rawId);
         setDetails(updated);
-        alert("Balance recorded as cash payment. Booking is now confirmed!");
+        toast.success("Balance recorded as cash payment. Booking is now confirmed!");
       } else {
         throw new Error("Failed to record cash payment");
       }
@@ -2025,8 +2026,9 @@ function WalletView() {
             </div>
             <button
               onClick={() => exportToCSV(filtered, "My_Transactions.csv")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gold/30 bg-gold/8 text-gold text-xs hover:bg-gold/15 transition-colors">
-              <Download className="h-3.5 w-3.5" /> {t("app.userDashboard.downloadStatement", "Download Statement")}
+              className="flex items-center gap-2 text-xs font-semibold gold-btn px-4 py-2 rounded-xl shadow-md shadow-gold/15 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
+            >
+              <Download className="h-4 w-4" /> {t("app.userDashboard.downloadStatement", "Download Statement")}
             </button>
             <div className="relative flex-1 sm:flex-initial">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -2955,17 +2957,17 @@ function ProfileView({ referralStats, refreshReferrals }: { referralStats: any; 
 
   async function handleSave() {
     if (!form.fullName.trim()) {
-      alert(t("app.validation.nameRequired", "Full name is required"));
+      toast.error(t("app.validation.nameRequired", "Full name is required"));
       return;
     }
     const emailTrim = form.email.trim();
     if (isEmailPlaceholder) {
       if (!emailTrim) {
-        alert(t("app.validation.emailRequired", "Email address is required"));
+        toast.error(t("app.validation.emailRequired", "Email address is required"));
         return;
       }
       if (!/\S+@\S+\.\S+/.test(emailTrim)) {
-        alert(t("app.validation.emailInvalid", "Please enter a valid email address"));
+        toast.error(t("app.validation.emailInvalid", "Please enter a valid email address"));
         return;
       }
     }
@@ -3000,10 +3002,11 @@ function ProfileView({ referralStats, refreshReferrals }: { referralStats: any; 
         });
       }
 
+      toast.success("Profile saved successfully!");
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
-      alert(err.message);
+      toast.error(err.message || "Failed to save profile");
     } finally {
       setSaving(false);
     }

@@ -4,6 +4,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useSuitesContext, type Suite } from "@/components/admin/SuitesContext";
 import { suitesApi } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 export function generateSlots(startTime: string, endTime: string, durationMins: number, gapMins: number = 30): string[] {
   const slots: string[] = [];
@@ -387,13 +388,19 @@ export default function SuitesPage() {
     try {
       await saveSuite(form, editId);
       setShowModal(false);
+      toast.success(editId ? "Suite updated successfully!" : "Suite created successfully!");
     } catch (err: any) {
-      alert(err.message || 'Failed to save suite');
+      toast.error(err.message || 'Failed to save suite');
     }
   }
 
   async function handleDelete(id: string) {
-    try { await apiDelete(id); } catch (err: any) { alert(err.message || 'Failed to delete suite'); }
+    try { 
+      await apiDelete(id); 
+      toast.success("Suite deleted successfully!");
+    } catch (err: any) { 
+      toast.error(err.message || 'Failed to delete suite'); 
+    }
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {

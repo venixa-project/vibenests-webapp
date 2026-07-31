@@ -113,6 +113,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }));
 
   const refresh = () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      setBookings([]);
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     Promise.all([
       bookingsApi.getAll()

@@ -471,11 +471,10 @@ export default function CommunicationPage() {
 
                   <button
                     onClick={downloadCSV}
-                    className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-xs px-3.5 py-2 rounded-xl transition-all font-semibold"
+                    className="flex items-center gap-2 text-xs font-semibold gold-btn px-4 py-2 rounded-xl shadow-md shadow-gold/15 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
                   >
-                    <Download className="h-3.5 w-3.5 text-gold" />
+                    <Download className="h-4 w-4" />
                     Export
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                   </button>
                 </div>
               </div>

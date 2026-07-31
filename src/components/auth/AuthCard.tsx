@@ -29,7 +29,7 @@ className="glass-card relative w-full max-w-md rounded-3xl p-7 sm:p-9"
           <h2 className="font-display text-3xl sm:text-4xl font-medium text-foreground">
             {t("app.auth.welcomeBack", "Welcome Back!")}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">{t("app.auth.loginDesc", "Sign in securely via WhatsApp or Email OTP")}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("app.auth.loginDesc", "Sign in securely via Mobile or Email OTP")}</p>
         </div>
 
         <div className="my-5 flex items-center gap-3 text-[11px] tracking-[0.3em] text-muted-foreground uppercase">
@@ -50,7 +50,7 @@ className="glass-card relative w-full max-w-md rounded-3xl p-7 sm:p-9"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tVal === "email" ? t("app.auth.emailOtpLogin", "Email OTP") : t("app.auth.whatsappOtpLogin", "WhatsApp OTP")}
+                {tVal === "email" ? t("app.auth.emailLoginTab", "Email") : t("app.auth.mobileLoginTab", "Mobile")}
               </button>
             ))}
           </div>

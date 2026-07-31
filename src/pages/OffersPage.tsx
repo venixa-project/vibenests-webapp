@@ -3,6 +3,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AlertTriangle, Save, X, Plus, Tag, Settings2, Trash2, Ticket } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { offersApi, couponsApi, offerConfigsApi, bookingRulesApi, liveCelebrationSettingsApi, addonsApi } from "@/lib/api";
+import { toast } from "sonner";
 
 const mapApiCoupon = (c: any) => ({
   id: c.id,
@@ -67,8 +68,9 @@ export default function OffersPage() {
     try {
       await couponsApi.remove(id);
       setCoupons((prev) => prev.filter((c) => c.id !== id));
+      toast.success("Coupon deleted successfully!");
     } catch (err: any) {
-      alert(err.message || "Failed to delete coupon");
+      toast.error(err.message || "Failed to delete coupon");
     }
   }
 
@@ -97,11 +99,12 @@ export default function OffersPage() {
       const list = await couponsApi.getAll();
       setCoupons((list?.data || list || []).map(mapApiCoupon));
       setNewCoupon({ code: "", type: "Percentage", value: "", minOrder: "", maxUses: "", expiry: "", status: "Active" });
+      toast.success("Coupon added successfully!");
       setCouponSaved(true); setTimeout(() => setCouponSaved(false), 3000);
       // Stay on coupon tab so user sees the added coupon in the list
       setTab("coupon");
     } catch (err: any) {
-      alert(err.message || "Failed to add coupon");
+      toast.error(err.message || "Failed to add coupon");
     }
   }
 
@@ -184,11 +187,12 @@ export default function OffersPage() {
       const list = await offersApi.getAll();
       setOffers((list?.data || list || []).map(mapApiOffer));
       setNewOffer({ name: "", type: "Percentage", value: "", categories: "", from: "", until: "", status: "Active" });
+      toast.success("Offer created successfully!");
       setOfferSaved(true); setTimeout(() => setOfferSaved(false), 3000);
       // Switch to the 'add' tab so the user sees the offer in the list immediately
       setTab("add");
     } catch (err: any) {
-      alert(err.message || "Failed to add offer");
+      toast.error(err.message || "Failed to add offer");
     }
   }
 
@@ -196,8 +200,9 @@ export default function OffersPage() {
     try {
       await offersApi.remove(id);
       setOffers((prev) => prev.filter((o) => o.id !== id));
+      toast.success("Offer deleted successfully!");
     } catch (err: any) {
-      alert(err.message || "Failed to delete offer");
+      toast.error(err.message || "Failed to delete offer");
     }
   }
 
@@ -364,10 +369,11 @@ export default function OffersPage() {
         await liveCelebrationSettingsApi.upsert(p as any);
       }
 
+      toast.success("Configurations saved successfully!");
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err: any) {
-      alert(err.message || "Failed to save configurations");
+      toast.error(err.message || "Failed to save configurations");
     }
   }
 

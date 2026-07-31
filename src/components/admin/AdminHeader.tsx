@@ -100,16 +100,6 @@ export function AdminHeader({ title }: AdminHeaderProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="relative hidden sm:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              placeholder={t("app.admin.search", "Search...")}
-              className="luxury-input rounded-lg pl-9 pr-4 py-2 text-sm w-52"
-            />
-          </div>
-
           {/* Language Switcher */}
           <LanguageSelector />
 
@@ -149,31 +139,28 @@ export function AdminHeader({ title }: AdminHeaderProps) {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-52 glass-card rounded-xl border border-[var(--gold)]/15 py-1 z-50">
-                <div className="px-4 py-2 border-b border-white/[0.06]">
-                  <p className="text-xs font-medium text-foreground truncate">{userName}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{userEmail}</p>
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+                <div className="absolute right-0 mt-2 w-52 glass-card rounded-xl border border-[var(--gold)]/15 py-1 z-50 shadow-2xl">
+                  <div className="px-4 py-2 border-b border-white/[0.06]">
+                    <p className="text-xs font-medium text-foreground truncate">{userName}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{userEmail}</p>
+                  </div>
+                  <button
+                    onClick={() => { setDropdownOpen(false); navigate("/settings"); }}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition cursor-pointer"
+                  >
+                    <User className="h-3.5 w-3.5" /> {t("app.admin.businessProfile", "Business Profile")}
+                  </button>
+                  <div className="h-px bg-white/[0.06] my-1" />
+                  <button
+                    onClick={() => { setDropdownOpen(false); setShowLogout(true); }}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition cursor-pointer"
+                  >
+                    <LogOut className="h-3.5 w-3.5" /> {t("app.admin.logout", "Logout")}
+                  </button>
                 </div>
-                <button
-                  onClick={() => { setDropdownOpen(false); navigate("/settings"); }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition cursor-pointer"
-                >
-                  <User className="h-3.5 w-3.5" /> {t("app.admin.profile", "Profile")}
-                </button>
-                <button
-                  onClick={() => { setDropdownOpen(false); navigate("/settings"); }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition cursor-pointer"
-                >
-                  <Settings className="h-3.5 w-3.5" /> {t("app.admin.settings", "Settings")}
-                </button>
-                <div className="h-px bg-white/[0.06] my-1" />
-                <button
-                  onClick={() => { setDropdownOpen(false); setShowLogout(true); }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition cursor-pointer"
-                >
-                  <LogOut className="h-3.5 w-3.5" /> {t("app.admin.logout", "Logout")}
-                </button>
-              </div>
+              </>
             )}
           </div>
         </div>

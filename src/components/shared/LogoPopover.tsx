@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 
 interface LogoPopoverProps {
   className?: string;
@@ -35,7 +36,7 @@ export function LogoPopover({ className = "h-20 w-auto" }: LogoPopoverProps) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShow(false)}
     >
-      <img src="/image.png" alt="VibeNests Logo" className={className} />
+      <CompanyLogo alt="VibeNests Logo" className={className} />
 
       {show && createPortal(
         <div
@@ -43,7 +44,7 @@ export function LogoPopover({ className = "h-20 w-auto" }: LogoPopoverProps) {
           style={{ left: pos.x, top: pos.y }}
         >
           <div className="glass-card rounded-2xl border border-[var(--gold)]/25 p-3 shadow-2xl">
-            <img src="/image.png" alt="VibeNests Logo" className="h-44 w-44 object-contain" />
+            <CompanyLogo alt="VibeNests Logo" className="h-44 w-44 object-contain" />
           </div>
         </div>,
         document.body

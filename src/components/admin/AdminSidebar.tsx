@@ -3,12 +3,14 @@ import { createPortal } from "react-dom";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthContext";
 import { authApi } from "@/lib/api";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import {
   LayoutDashboard,
   CalendarDays,
   BedDouble,
   BarChart2,
   Settings,
+  Building2,
   LogOut,
   Menu,
   Tag,
@@ -76,16 +78,16 @@ const navSections = [
     items: [
       { icon: BedDouble, label: "Suites", to: "/rooms" },
       { icon: Package, label: "Add-on Management", to: "/addons" },
-      { icon: Gift, label: "Celebration Membership", to: "/celebration-memberships" },
+      // { icon: Gift, label: "Celebration Membership", to: "/celebration-memberships" },
       { icon: Tag, label: "Offers & Coupon Configurations", to: "/offers" },
       { icon: RotateCcw, label: "Refund Configurations", to: "/refunds" },
     ],
   },
   {
-    title: "System Configurations",
-    icon: Settings,
+    title: "Business Profile",
+    icon: Building2,
     items: [
-      { icon: Settings, label: "Settings", to: "/settings" },
+      { icon: Building2, label: "Business Profile", to: "/settings" },
     ],
   },
 ];
@@ -161,7 +163,7 @@ export function AdminSidebar() {
         <div className="flex items-center justify-between px-3 h-[88px] border-b border-[var(--gold)]/10 shrink-0">
           {(!collapsed || mobileOpen) && (
             <div className="flex items-center gap-2">
-              <img src="/image.png" alt="VibeNests" className="h-[72px] w-[72px] object-contain shrink-0" />
+              <CompanyLogo className="h-[72px] w-[72px] object-contain shrink-0" alt="VibeNests" />
               <div className="leading-tight">
                 <div className="font-display text-xl font-semibold tracking-wide text-gradient-gold">VIBENESTS</div>
                 <div className="text-[10px] tracking-widest text-muted-foreground uppercase">{t("app.admin.adminPanel", "Admin Panel")}</div>

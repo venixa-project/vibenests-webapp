@@ -36,11 +36,11 @@ export function EmailLoginForm() {
     }
     setLoading(true);
     try {
-      await authApi.sendEmailOtp(targetEmail);
+      const res = await authApi.sendEmailOtp(targetEmail);
       setOtp(Array(4).fill(""));
       setStage("otp");
       setTimer(30);
-      const msg = `OTP sent successfully to ${targetEmail}`;
+      const msg = res.otp ? `OTP sent: ${res.otp}` : `OTP sent successfully to ${targetEmail}`;
       setSuccessPopup(msg);
       setTimeout(() => setSuccessPopup(null), 3500);
       setTimeout(() => inputsRef.current[0]?.focus(), 50);

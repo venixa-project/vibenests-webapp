@@ -35,7 +35,7 @@ const NAV_ITEMS = [
   { id: "upcoming", label: "Upcoming Bookings", icon: Clock, path: "/user/dashboard" },
   { id: "past", label: "Past Bookings", icon: History, path: "/user/dashboard" },
   { id: "wallet", label: "Payments", icon: Wallet, path: "/user/dashboard" },
-  { id: "memberships", label: "Celebration Packages", icon: Award, path: "/user/dashboard" },
+  // { id: "memberships", label: "Celebration Packages", icon: Award, path: "/user/dashboard" },
   { id: "offers", label: "Special Offers", icon: Tag, path: "/user/dashboard" },
   { id: "profile", label: "Profile Settings", icon: UserCircle, path: "/user/dashboard" },
   { id: "help", label: "Help & Support", icon: HelpCircle, path: "/user/dashboard" },
@@ -608,12 +608,14 @@ export default function SuiteBookingPage() {
               <Sparkles className="h-7 w-7 text-gold" />
             </div>
             <h2 className="font-display text-3xl text-foreground">
-              {passedPackage ? "Package Activated!" : "Booking Confirmed!"}
+              {passedPackage ? "Package Activated!" : (paymentMethod === "pay-venue" ? "Advance Received (Pending Venue Payment)" : "Booking Confirmed!")}
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {passedPackage
                 ? `Your VibeNests ${passedPackage.name} Package has been successfully activated. You can now use your booking credits to reserve suites.`
-                : "Your luxury suite has been reserved. A confirmation will be sent to you shortly."}
+                : (paymentMethod === "pay-venue"
+                  ? "Your 20% advance payment has been received. Your booking is registered and pending final payment at the venue."
+                  : "Your payment was completed successfully and your luxury suite booking is confirmed.")}
             </p>
             <div className="glass rounded-2xl p-4 text-left space-y-2 border border-white/10">
               {passedPackage ? (
@@ -1391,18 +1393,6 @@ export default function SuiteBookingPage() {
                                 setPaying(false);
                               } else if (paymentMethod === "pay-now") {
                                 const createOrderRes = await paymentsApi.createOrder(Number(createdBookingId), payableNow, "razorpay");
-
-                                if ((createOrderRes as any)?.devMode) {
-                                  await paymentsApi.verifyPayment(
-                                    createOrderRes.paymentId,
-                                    createOrderRes.orderId,
-                                    `pay_dev_${Date.now()}`,
-                                    `sig_dev_${Date.now()}`
-                                  );
-                                  setConfirmed(true);
-                                  setPaying(false);
-                                  return;
-                                }
 
                                 const w = window as any;
                                 if (!createOrderRes?.keyId || !createOrderRes?.orderId) {

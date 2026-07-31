@@ -165,8 +165,11 @@ export default function TransactionsPage() {
           <button onClick={load} className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-white/10 text-muted-foreground hover:text-gold hover:border-gold/30 transition">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </button>
-          <button onClick={exportCSV} className="flex items-center gap-2 text-xs gold-btn px-4 py-2 rounded-lg font-medium ml-auto">
-            <Download className="h-3.5 w-3.5" /> {t("app.admin.export", "Export")}
+          <button 
+            onClick={exportCSV} 
+            className="flex items-center gap-2 text-xs font-semibold gold-btn px-4 py-2 rounded-xl shadow-md shadow-gold/15 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer ml-auto"
+          >
+            <Download className="h-4 w-4" /> {t("app.admin.export", "Export")}
           </button>
         </div>
 

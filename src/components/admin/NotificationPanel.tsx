@@ -96,10 +96,12 @@ export function NotificationPanel({
   if (!open) return null;
 
   return (
-    <div
-      ref={ref}
-      className="absolute right-0 top-full mt-2 w-80 glass-card rounded-2xl border border-[var(--gold)]/15 z-50 overflow-hidden shadow-2xl"
-    >
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        ref={ref}
+        className="absolute right-0 top-full mt-2 w-80 glass-card rounded-2xl border border-[var(--gold)]/15 z-50 overflow-hidden shadow-2xl"
+      >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
         <div className="flex items-center gap-2">
@@ -171,5 +173,6 @@ export function NotificationPanel({
         </button>
       </div>
     </div>
+    </>
   );
 }

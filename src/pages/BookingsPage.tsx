@@ -783,8 +783,11 @@ export default function BookingsPage() {
           )}
           <button onClick={() => { setSearch(""); setStatusFilter("All"); setOccasionFilter("All"); setSuiteFilter("All"); setDateFilter(""); }}
             className="text-xs text-muted-foreground hover:text-gold transition px-3 py-2 rounded-lg border border-white/10 hover:border-[var(--gold)]/30">{t("app.admin.clear", "Clear")}</button>
-          <button onClick={() => exportToCSV(filtered, "Bookings_Export.csv")} className="flex items-center gap-2 text-xs gold-btn px-3 py-2 rounded-lg font-medium ml-auto">
-            <Download className="h-3.5 w-3.5" /> {t("app.admin.export", "Export")}
+          <button 
+            onClick={() => exportToCSV(filtered, "Bookings_Export.csv")} 
+            className="flex items-center gap-2 text-xs font-semibold gold-btn px-4 py-2 rounded-xl shadow-md shadow-gold/15 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer ml-auto"
+          >
+            <Download className="h-4 w-4" /> {t("app.admin.export", "Export")}
           </button>
         </div>
 
