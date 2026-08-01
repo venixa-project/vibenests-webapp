@@ -86,58 +86,28 @@ export const authApi = {
       body: JSON.stringify({ email }),
     }),
   sendOtp: async (phone: string) => {
-    console.log(`%c[OTP DISPATCH LOG] 📱 Sending Mobile/WhatsApp OTP to: ${phone}`, 'color: #3b82f6; font-weight: bold;');
-    try {
-      const res = await request<{ message: string; channel?: string; otp?: string }>('/auth/otp/send', { method: 'POST', body: JSON.stringify({ phone }) });
-      console.log(`%c[OTP DISPATCH RESPONSE]`, 'color: #10b981; font-weight: bold;', res);
-      // if (res.otp) {
-      //   console.log(`%c🔑 [INSPECT LOG] Mobile OTP Code for ${phone}: ${res.otp}`, 'color: #ffffff; background: #059669; font-weight: bold; font-size: 13px; padding: 4px 8px; border-radius: 4px;');
-      // }
-      return res;
-    } catch (err: any) {
-      console.error(`%c[OTP DISPATCH ERROR] Failed sending Mobile OTP to ${phone}:`, 'color: #ef4444; font-weight: bold;', err?.message || err);
-      throw err;
-    }
+    return request<{ message: string; channel?: string; otp?: string }>('/auth/otp/send', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
   },
   sendEmailOtp: async (email: string) => {
-    console.log(`%c[OTP DISPATCH LOG] 📧 Sending Email OTP to: ${email}`, 'color: #3b82f6; font-weight: bold;');
-    try {
-      const res = await request<{ message: string; channel?: string; otp?: string }>('/auth/otp/send', { method: 'POST', body: JSON.stringify({ email }) });
-      console.log(`%c[OTP DISPATCH RESPONSE]`, 'color: #10b981; font-weight: bold;', res);
-      // if (res.otp) {
-      //   console.log(`%c🔑 [INSPECT LOG] Email OTP Code for ${email}: ${res.otp}`, 'color: #ffffff; background: #059669; font-weight: bold; font-size: 13px; padding: 4px 8px; border-radius: 4px;');
-      // }
-      return res;
-    } catch (err: any) {
-      console.error(`%c[OTP DISPATCH ERROR] Failed sending Email OTP to ${email}:`, 'color: #ef4444; font-weight: bold;', err?.message || err);
-      throw err;
-    }
+    return request<{ message: string; channel?: string; otp?: string }>('/auth/otp/send', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
   },
   verifyOtp: async (phone: string, otp: string) => {
-    console.log(`%c[OTP VERIFY LOG] 🔐 Verifying Mobile OTP ${otp} for: ${phone}`, 'color: #8b5cf6; font-weight: bold;');
-    try {
-      const res = await request<{ accessToken: string; refreshToken: string; user: { id: number; email: string; role: string; phone?: string } }>(
-        '/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone, otp }) }
-      );
-      console.log(`%c[OTP VERIFY SUCCESS] Mobile OTP verified successfully for ${phone}`, 'color: #10b981; font-weight: bold;', res);
-      return res;
-    } catch (err: any) {
-      console.error(`%c[OTP VERIFY ERROR] Mobile OTP verification failed for ${phone}:`, 'color: #ef4444; font-weight: bold;', err?.message || err);
-      throw err;
-    }
+    return request<{ accessToken: string; refreshToken: string; user: { id: number; email: string; role: string; phone?: string } }>(
+      '/auth/otp/verify',
+      { method: 'POST', body: JSON.stringify({ phone, otp }) }
+    );
   },
   verifyEmailOtp: async (email: string, otp: string) => {
-    console.log(`%c[OTP VERIFY LOG] 🔐 Verifying Email OTP ${otp} for: ${email}`, 'color: #8b5cf6; font-weight: bold;');
-    try {
-      const res = await request<{ accessToken: string; refreshToken: string; user: { id: number; email: string; role: string; phone?: string } }>(
-        '/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }
-      );
-      console.log(`%c[OTP VERIFY SUCCESS] Email OTP verified successfully for ${email}`, 'color: #10b981; font-weight: bold;', res);
-      return res;
-    } catch (err: any) {
-      console.error(`%c[OTP VERIFY ERROR] Email OTP verification failed for ${email}:`, 'color: #ef4444; font-weight: bold;', err?.message || err);
-      throw err;
-    }
+    return request<{ accessToken: string; refreshToken: string; user: { id: number; email: string; role: string; phone?: string } }>(
+      '/auth/otp/verify',
+      { method: 'POST', body: JSON.stringify({ email, otp }) }
+    );
   },
   register: (body: any) =>
     request<{ accessToken: string; refreshToken: string; user: { id: number; email: string; role: string; fullName?: string } }>('/auth/register', {

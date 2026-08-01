@@ -43,7 +43,7 @@ export function MobileOtpForm() {
       setOtp(Array(4).fill(""));
       setStage("otp");
       setTimer(30);
-      const msg = res.otp ? `OTP sent: ${res.otp}` : `OTP sent successfully to ${recipient}`;
+      const msg = res.message || `OTP sent successfully to ${recipient}`;
       setSuccessPopup(msg);
       setTimeout(() => setSuccessPopup(null), 3500);
       setTimeout(() => inputsRef.current[0]?.focus(), 50);
