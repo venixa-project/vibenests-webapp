@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Filter, Download, Plus, X, Check, ChevronRight, ChevronLeft, Eye, Clock } from "lucide-react";
+import { Search, Filter, Download, Plus, X, Check, ChevronRight, ChevronLeft, Eye, Clock, Sparkles, Tag, Percent } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DateRangePicker } from "@/components/admin/DateRangePicker";
 import { useAppData } from "@/components/admin/AppDataContext";
-import { suitesApi, addonsApi, bookingsApi, refundsApi, usersApi } from "@/lib/api";
+import { suitesApi, addonsApi, bookingsApi, refundsApi, usersApi, offersApi, couponsApi } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { exportToCSV } from "@/lib/csvExport";
+import { toast } from "sonner";
 
 const statusStyle: Record<string, string> = {
   Confirmed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -140,10 +141,47 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
   // Step 1 state
   const [guest, setGuest] = useState(emptyGuest);
 
+  // User Special Offers & Coupons State
+  const [userSpecialOffers, setUserSpecialOffers] = useState<any[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [selectedSpecialOffer, setSelectedSpecialOffer] = useState<any | null>(null);
+
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState<number>(0);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState("");
+
   useEffect(() => {
     suitesApi.getAll().then((list) => setSuites(list as ApiSuite[])).catch(() => { });
     addonsApi.getAll().then((list) => setAddons(list as ApiAddon[])).catch(() => { });
   }, []);
+
+  // Fetch assigned special offers whenever selected registered user changes
+  useEffect(() => {
+    if (selectedRegisteredUserId) {
+      setLoadingOffers(true);
+      offersApi.getUserOffers(selectedRegisteredUserId)
+        .then((offers) => {
+          const list = Array.isArray(offers) ? offers : [];
+          setUserSpecialOffers(list);
+          const matching = list.find((o) => !o.suiteId || String(o.suiteId) === String(selectedSuite?.id));
+          if (matching) {
+            setSelectedSpecialOffer(matching);
+          } else {
+            setSelectedSpecialOffer(null);
+          }
+        })
+        .catch(() => {
+          setUserSpecialOffers([]);
+          setSelectedSpecialOffer(null);
+        })
+        .finally(() => setLoadingOffers(false));
+    } else {
+      setUserSpecialOffers([]);
+      setSelectedSpecialOffer(null);
+    }
+  }, [selectedRegisteredUserId, selectedSuite?.id]);
 
   function toggleAddon(a: ApiAddon) {
     setSelectedAddons((prev) =>
@@ -158,15 +196,57 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
     setEndTime(getEndTime(slot, duration));
   }
 
-const suitePrice = selectedSuite ? Number(selectedSuite.price) : 0;
+  const suitePrice = selectedSuite ? Number(selectedSuite.price) : 0;
   const addonsTotal = selectedAddons.reduce((s, a) => s + Number(a.price), 0);
 
   // Admin persons (similar to user booking)
   const [persons, setPersons] = useState<number>(1);
   const personsCost = suitePrice * Math.max(0, Number(persons) - 1);
+  const subtotal = suitePrice + personsCost + addonsTotal;
 
-  const totalAmount = suitePrice + personsCost + addonsTotal;
+  // Calculate Special Offer discount
+  let offerDiscount = 0;
+  if (selectedSpecialOffer) {
+    if (selectedSpecialOffer.discountType === "percentage") {
+      offerDiscount = Math.round(suitePrice * (Number(selectedSpecialOffer.discountValue) / 100));
+    } else {
+      offerDiscount = Number(selectedSpecialOffer.discountValue) || 0;
+    }
+  }
 
+  const totalDiscount = offerDiscount + couponDiscount;
+  const totalAmount = Math.max(0, subtotal - totalDiscount);
+
+  // Handle Coupon Apply
+  async function handleApplyCoupon() {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError("");
+    try {
+      const res = await couponsApi.validate({
+        code: couponCode.trim().toUpperCase(),
+        bookingAmount: subtotal,
+      });
+      if (res?.valid) {
+        setAppliedCoupon(res.coupon || { code: couponCode.trim().toUpperCase() });
+        setCouponDiscount(Number(res.discountAmount || 0));
+        toast.success(`Coupon "${couponCode.trim().toUpperCase()}" applied!`);
+      } else {
+        setCouponError(res?.message || "Invalid or ineligible coupon code");
+      }
+    } catch (e: any) {
+      setCouponError(e?.message || "Failed to validate coupon");
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+    setCouponCode("");
+    setCouponError("");
+  }
 
   function validateStep0() {
     if (!date) return t("app.admin.selectDate", "Please select a date.");
@@ -193,10 +273,8 @@ const suitePrice = selectedSuite ? Number(selectedSuite.price) : 0;
     setStep((s) => s + 1);
   }
 
-async function handleConfirm() {
-
+  async function handleConfirm() {
     setLoading(true);
-
     setError("");
     try {
       if (paymentOption === 'razorpay_link') {
@@ -213,6 +291,9 @@ async function handleConfirm() {
           guestPhone: guest.phone,
           totalAmount,
           persons,
+          couponCode: appliedCoupon?.code || (couponCode ? couponCode.trim().toUpperCase() : undefined),
+          specialOfferId: selectedSpecialOffer?.id ? Number(selectedSpecialOffer.id) : undefined,
+          discountAmount: totalDiscount,
         });
 
         setPaymentLink(res.paymentLink || '');
@@ -234,6 +315,9 @@ async function handleConfirm() {
         guestPhone: guest.phone,
         totalAmount,
         persons,
+        couponCode: appliedCoupon?.code || (couponCode ? couponCode.trim().toUpperCase() : undefined),
+        specialOfferId: selectedSpecialOffer?.id ? Number(selectedSpecialOffer.id) : undefined,
+        discountAmount: totalDiscount,
       });
       onCreated(booking);
       onClose();
@@ -514,6 +598,118 @@ async function handleConfirm() {
                 value={guest.phone} onChange={(e) => setGuest((g) => ({ ...g, phone: e.target.value }))}
                 className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" />
             </div>
+
+            {/* ── Assigned Special Offers Section ── */}
+            {selectedRegisteredUserId && (
+              <div className="pt-2 border-t border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-gold">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Special Offers for {guest.firstName || "Customer"}</span>
+                  </div>
+                  {loadingOffers && <span className="text-[10px] text-muted-foreground animate-pulse">Loading offers...</span>}
+                </div>
+
+                {userSpecialOffers.length === 0 && !loadingOffers && (
+                  <p className="text-[11px] text-muted-foreground italic bg-white/[0.02] border border-white/5 rounded-lg p-2">
+                    No active special offers currently assigned to this user.
+                  </p>
+                )}
+
+                {userSpecialOffers.map((offer) => {
+                  const isSelected = selectedSpecialOffer?.id === offer.id;
+                  const discountBadge = offer.discountType === "percentage" ? `${offer.discountValue}% OFF` : `₹${offer.discountValue} OFF`;
+                  const isSuiteMatch = !offer.suiteId || String(offer.suiteId) === String(selectedSuite?.id);
+
+                  return (
+                    <div
+                      key={offer.id}
+                      onClick={() => setSelectedSpecialOffer(isSelected ? null : offer)}
+                      className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? "bg-gold/15 border-gold shadow-md shadow-gold/10"
+                          : "bg-white/[0.02] border-white/10 hover:border-gold/40"
+                      }`}
+                    >
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-1.5 py-0.5 rounded bg-gold/20 text-gold border border-gold/40 text-[10px] font-bold">
+                            {discountBadge}
+                          </span>
+                          <span className="text-xs font-semibold text-foreground truncate">{offer.title}</span>
+                        </div>
+                        {offer.suiteName && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Valid for: <strong className={isSuiteMatch ? "text-emerald-400" : "text-amber-400"}>{offer.suiteName}</strong>
+                            {!isSuiteMatch && selectedSuite && " (Different suite selected)"}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSpecialOffer(isSelected ? null : offer);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition ${
+                          isSelected
+                            ? "bg-gold text-black shadow-xs"
+                            : "border border-gold/40 text-gold hover:bg-gold/10"
+                        }`}
+                      >
+                        {isSelected ? "✓ Applied" : "Apply"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── Coupon Code Section ── */}
+            <div className="pt-2 border-t border-white/10 space-y-1.5">
+              <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                <Tag className="h-3 w-3 text-gold" />
+                <span>Apply Coupon Code</span>
+              </label>
+
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-emerald-400 uppercase tracking-wider">{appliedCoupon.code}</span>
+                    <span className="text-emerald-300 font-medium">(-₹{couponDiscount.toLocaleString("en-IN")})</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-[11px] text-rose-400 hover:underline cursor-pointer font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. VIP20 or WELCOME"
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value);
+                      setCouponError("");
+                    }}
+                    className="luxury-input flex-1 rounded-lg px-3 py-1.5 text-sm uppercase"
+                  />
+                  <button
+                    type="button"
+                    disabled={!couponCode.trim() || couponLoading}
+                    onClick={handleApplyCoupon}
+                    className="gold-btn px-4 py-1.5 rounded-lg text-xs font-semibold shrink-0 disabled:opacity-50 cursor-pointer"
+                  >
+                    {couponLoading ? "Checking..." : "Apply"}
+                  </button>
+                </div>
+              )}
+              {couponError && <p className="text-[11px] text-rose-400">{couponError}</p>}
+            </div>
           </div>
         )}
 
@@ -601,14 +797,40 @@ async function handleConfirm() {
                 <span>₹{suitePrice.toLocaleString("en-IN")}</span>
               </div>
 
+              {persons > 1 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Extra Guests ({persons - 1})</span>
+                  <span>₹{personsCost.toLocaleString("en-IN")}</span>
+                </div>
+              )}
+
               {selectedAddons.map((a) => (
-                <div key={a.id} className="flex justify-between">
+                <div key={a.id} className="flex justify-between text-xs">
                   <span className="text-muted-foreground">{a.name}</span>
                   <span>₹{Number(a.price).toLocaleString("en-IN")}</span>
                 </div>
               ))}
-              <div className="border-t border-[var(--gold)]/20 pt-2 flex justify-between font-semibold text-gold">
-                <span>{t("app.admin.total", "Total")}</span>
+
+              {selectedSpecialOffer && (
+                <div className="flex justify-between text-xs font-semibold text-emerald-400 border-t border-white/5 pt-1">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Special Offer ({selectedSpecialOffer.title})
+                  </span>
+                  <span>-₹{offerDiscount.toLocaleString("en-IN")}</span>
+                </div>
+              )}
+
+              {appliedCoupon && (
+                <div className="flex justify-between text-xs font-semibold text-emerald-400">
+                  <span className="flex items-center gap-1">
+                    <Tag className="h-3 w-3" /> Coupon ({appliedCoupon.code})
+                  </span>
+                  <span>-₹{couponDiscount.toLocaleString("en-IN")}</span>
+                </div>
+              )}
+
+              <div className="border-t border-[var(--gold)]/20 pt-2 flex justify-between font-semibold text-gold text-base">
+                <span>{t("app.admin.total", "Total Payable")}</span>
                 <span>₹{totalAmount.toLocaleString("en-IN")}</span>
               </div>
             </div>
@@ -679,11 +901,11 @@ export default function BookingsPage() {
     if (!window.confirm("Are you sure you want to approve this refund request? This will mark the booking as refunded, cancel its slot reservation, and issue the calculated refund.")) return;
     try {
       await refundsApi.process(refundId, 'approve');
-      alert("Refund and booking cancellation approved successfully!");
+      toast.success("Refund and booking cancellation approved successfully!");
       fetchRefundRequests();
       refresh();
     } catch (e: any) {
-      alert(e?.message || "Failed to approve refund");
+      toast.error(e?.message || "Failed to approve refund");
     }
   }
 
@@ -691,16 +913,16 @@ export default function BookingsPage() {
     const reason = window.prompt("Please provide a reason for rejecting this cancellation/refund request:");
     if (reason === null) return;
     if (!reason.trim()) {
-      alert("Rejection reason is required to reject a cancellation request.");
+      toast.error("Rejection reason is required to reject a cancellation request.");
       return;
     }
     try {
       await refundsApi.process(refundId, 'reject', reason);
-      alert("Refund request rejected successfully.");
+      toast.success("Refund request rejected successfully.");
       fetchRefundRequests();
       refresh();
     } catch (e: any) {
-      alert(e?.message || "Failed to reject refund");
+      toast.error(e?.message || "Failed to reject refund");
     }
   }
 

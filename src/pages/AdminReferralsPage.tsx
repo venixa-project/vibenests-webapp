@@ -3,6 +3,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { Search, Check, X, Award, AlertTriangle, ArrowRight, Loader2, RefreshCw } from "lucide-react";
 import { referralsApi, offerConfigsApi } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 export default function AdminReferralsPage() {
   const { t } = useTranslation();
@@ -57,10 +58,10 @@ export default function AdminReferralsPage() {
     try {
       setActionBusy(rewardId);
       await referralsApi.adminApproveReward(rewardId);
-      alert("Reward approved and coupon activated successfully!");
+      toast.success("Reward approved and coupon activated successfully!");
       loadReferrals();
     } catch (err: any) {
-      alert(err.message || "Failed to approve reward");
+      toast.error(err.message || "Failed to approve reward");
     } finally {
       setActionBusy(null);
     }
@@ -71,10 +72,10 @@ export default function AdminReferralsPage() {
     try {
       setActionBusy(rewardId);
       await referralsApi.adminRevokeReward(rewardId);
-      alert("Reward revoked successfully.");
+      toast.success("Reward revoked successfully.");
       loadReferrals();
     } catch (err: any) {
-      alert(err.message || "Failed to revoke reward");
+      toast.error(err.message || "Failed to revoke reward");
     } finally {
       setActionBusy(null);
     }
@@ -91,9 +92,9 @@ export default function AdminReferralsPage() {
         configKey: "REFERRAL_REWARD_VALUE",
         configValue: String(rewardValue),
       });
-      alert("Referral settings updated successfully!");
+      toast.success("Referral settings updated successfully!");
     } catch (err: any) {
-      alert(err.message || "Failed to update settings");
+      toast.error(err.message || "Failed to update settings");
     } finally {
       setUpdatingConfig(false);
     }

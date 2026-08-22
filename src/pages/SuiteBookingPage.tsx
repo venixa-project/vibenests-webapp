@@ -263,11 +263,21 @@ export default function SuiteBookingPage() {
 
   const [activeOffers, setActiveOffers] = useState<any[]>([]);
 
-  // Fetch active offers list
+  // Fetch active offers list (both user-assigned special offers and active public offers)
   useEffect(() => {
-    offersApi.getActive().then((list) => {
-      setActiveOffers(Array.isArray(list) ? list : []);
-    }).catch(() => setActiveOffers([]));
+    (async () => {
+      try {
+        const [mySpecial, publicOffers] = await Promise.all([
+          offersApi.getMySpecialOffers().catch(() => []),
+          offersApi.getActive().catch(() => []),
+        ]);
+        const combined = [...(Array.isArray(mySpecial) ? mySpecial : []), ...(Array.isArray(publicOffers) ? publicOffers : [])];
+        const unique = Array.from(new Map(combined.map((o) => [o.id, o])).values());
+        setActiveOffers(unique);
+      } catch {
+        setActiveOffers([]);
+      }
+    })();
   }, []);
 
   async function applyCoupon(codeToUse?: string) {
@@ -405,10 +415,11 @@ export default function SuiteBookingPage() {
   const addonsTotal = (addons.reduce((sum: number, a) => sum + Number(a.price) * (addonQty[String(a.id)] || 0), 0) + personsTotal) * numSlots;
   const basePrice = (passedPackage ? Number(passedPackage.price) : suiteBasePrice) * (passedPackage ? 1 : numSlots);
 
-  // Pre-select suite passed from Book Now
+  // Pre-select suite passed from Book Now or URL query params
   useEffect(() => {
-    // location.state is not persistent on refresh; guard usage.
-    const passedId = (location.state as any)?.suiteId;
+    const urlParams = new URLSearchParams(location.search);
+    const paramSuite = urlParams.get('suiteId');
+    const passedId = (location.state as any)?.suiteId || paramSuite;
     if (passedId && suites.length > 0) {
       const found = suites.find((s) => s.id === String(passedId));
       if (found) {
@@ -416,9 +427,7 @@ export default function SuiteBookingPage() {
         setPersons(found.minCapacity);
       }
     }
-    // Intentionally depend only on `suites` to avoid re-running when `location.state` is reset on refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suites]);
+  }, [suites, location.search]);
   const subtotal = basePrice + addonsTotal;
 
   const filteredCoupons = useMemo(() => {
@@ -440,10 +449,9 @@ export default function SuiteBookingPage() {
   const bestOffer = useMemo(() => {
     if (activeOffers.length === 0) return null;
 
-    // Globally disabled check via settings
-    if (offerConfig && offerConfig.enableOffers !== 'true') return null;
+    const urlParams = new URLSearchParams(location.search);
+    const paramSpecialOfferId = urlParams.get('specialOfferId');
 
-    // Convert selection ID to category label matching admin options
     const categoryLabelMap: Record<string, string> = {
       "birthday": "Birthday",
       "anniversary": "Anniversary",
@@ -454,18 +462,26 @@ export default function SuiteBookingPage() {
     };
 
     const targetLabel = categoryLabelMap[selectedOccasion] || "";
-    if (!targetLabel) return null;
-
     let highestSavings = 0;
     let selectedOffer = null;
 
     for (const offer of activeOffers) {
-      // Parse description which stores applicable categories (occasions)
+      // If user came via specific special offer link
+      const isDirectMatch = paramSpecialOfferId && String(offer.id) === String(paramSpecialOfferId);
+
+      // If offer targets a specific suite, verify it matches
+      const isSuiteMatched = !offer.suiteId || String(offer.suiteId) === String(selectedSuite);
+      if (!isSuiteMatched && !isDirectMatch) continue;
+
+      // Occasion matching
       const configuredCats = offer.description || "";
       const catsList = configuredCats.split(",").map((c: any) => c.trim().toLowerCase());
-      const isMatched = catsList.includes("all") || catsList.includes(targetLabel.toLowerCase());
+      const isOccasionMatched =
+        offer.suiteId || isDirectMatch // Suite-specific offers apply regardless of occasion
+          ? true
+          : (catsList.includes("all") || (targetLabel && catsList.includes(targetLabel.toLowerCase())));
 
-      if (isMatched) {
+      if (isOccasionMatched) {
         const discVal = Number(offer.discountValue || 0);
         if (discVal <= 0) continue;
 
@@ -487,7 +503,7 @@ export default function SuiteBookingPage() {
     }
 
     return selectedOffer;
-  }, [activeOffers, offerConfig, selectedOccasion, subtotal]);
+  }, [activeOffers, offerConfig, selectedSuite, selectedOccasion, subtotal, location.search]);
 
   const offerSavings = bestOffer ? bestOffer.computedSavings : 0;
 
@@ -1381,6 +1397,7 @@ export default function SuiteBookingPage() {
                                 paymentMode: passedPackage ? "package_purchase" : (paymentMethod === "package-credit" ? "package_credit" : (paymentMethod === "pay-now" ? "pay_now" : "pay_at_venue")),
                                 advanceAmount: paymentMethod === "package-credit" ? 0 : (paymentMethod === "pay-now" ? payableNow : payableAtVenue),
                                 couponCode: couponCode || undefined,
+                                specialOfferId: bestOffer?.id ? Number(bestOffer.id) : undefined,
                               };
 
                               const bookingRes = await bookingsApi.create(bookingPayload);
@@ -1401,11 +1418,15 @@ export default function SuiteBookingPage() {
 
                                 if (!w.Razorpay) throw new Error("Razorpay SDK not loaded");
 
+                                const authUserRaw = localStorage.getItem("authUser");
+                                const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+
                                 const razorpayOptions = {
                                   key: createOrderRes.keyId,
-                                  amount: createOrderRes.amount,
+                                  amount: Math.round(Number(createOrderRes.amount) * 100),
                                   currency: "INR",
                                   name: "VibeNests",
+                                  description: `Suite Booking #${createdBookingId}`,
                                   order_id: createOrderRes.orderId,
                                   handler: async (response: any) => {
                                     try {
@@ -1430,9 +1451,9 @@ export default function SuiteBookingPage() {
                                     }
                                   },
                                   prefill: {
-                                    name: "Guest",
-                                    email: "",
-                                    contact: "",
+                                    name: authUser?.fullName || "Guest",
+                                    email: authUser?.email && !authUser.email.endsWith('@phone.local') ? authUser.email : "",
+                                    contact: authUser?.phone || "",
                                   },
                                   theme: { color: "#b8972a" },
                                   modal: {
@@ -1449,6 +1470,11 @@ export default function SuiteBookingPage() {
                                 };
 
                                 const rzp = new w.Razorpay(razorpayOptions);
+                                rzp.on("payment.failed", function (response: any) {
+                                  console.warn("Razorpay payment failed:", response?.error);
+                                  setPayError(response?.error?.description || "Payment failed. Please try again.");
+                                  setPaying(false);
+                                });
                                 rzp.open();
                               } else {
                                 // Pay at venue: still take 20% advance via Razorpay,
@@ -1463,11 +1489,15 @@ export default function SuiteBookingPage() {
 
                                 if (!w.Razorpay) throw new Error("Razorpay SDK not loaded");
 
+                                const authUserRaw = localStorage.getItem("authUser");
+                                const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+
                                 const razorpayOptions = {
                                   key: createOrderRes.keyId,
-                                  amount: createOrderRes.amount,
+                                  amount: Math.round(Number(createOrderRes.amount) * 100),
                                   currency: "INR",
                                   name: "VibeNests",
+                                  description: `Advance Payment for Suite Booking #${createdBookingId}`,
                                   order_id: createOrderRes.orderId,
                                   handler: async (response: any) => {
                                     try {
@@ -1497,14 +1527,30 @@ export default function SuiteBookingPage() {
                                     }
                                   },
                                   prefill: {
-                                    name: "Guest",
-                                    email: "",
-                                    contact: "",
+                                    name: authUser?.fullName || "Guest",
+                                    email: authUser?.email && !authUser.email.endsWith('@phone.local') ? authUser.email : "",
+                                    contact: authUser?.phone || "",
                                   },
                                   theme: { color: "#b8972a" },
+                                  modal: {
+                                    ondismiss: async function () {
+                                      try {
+                                        await bookingsApi.cancel(Number(createdBookingId), { reason: "Payment aborted by user" });
+                                      } catch (e) {
+                                        console.error("Failed to cancel aborted booking", e);
+                                      }
+                                      setPaying(false);
+                                      setPayError("Payment was cancelled. The slot has been freed.");
+                                    }
+                                  }
                                 };
 
                                 const rzp = new w.Razorpay(razorpayOptions);
+                                rzp.on("payment.failed", function (response: any) {
+                                  console.warn("Razorpay advance payment failed:", response?.error);
+                                  setPayError(response?.error?.description || "Payment failed. Please try again.");
+                                  setPaying(false);
+                                });
                                 rzp.open();
                               }
                             } catch (e: any) {

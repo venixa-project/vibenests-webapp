@@ -6,6 +6,7 @@ import {
 import { reviewsApi } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 interface ReviewUser {
   id: number;
@@ -62,8 +63,9 @@ export default function ReviewsPage() {
     try {
       await reviewsApi.remove(id);
       setReviews((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Review deleted successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to delete review.");
+      toast.error(err.message || "Failed to delete review.");
     } finally {
       setDeletingId(null);
     }

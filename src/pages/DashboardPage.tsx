@@ -23,10 +23,10 @@ export default function DashboardPage() {
   const { t } = useTranslation();
 
   const cards = [
-    { title: t("app.admin.totalRevenue", "Total Revenue"),      value: fmtRevenue(filteredStats.totalRevenue),               change: "+18%", positive: true,  icon: IndianRupee,  onClick: () => navigate("/revenue") },
-    { title: t("app.admin.totalBookings", "Total Bookings"),     value: String(filteredStats.totalBookings),                  change: "+12%", positive: true,  icon: CalendarDays, onClick: () => navigate("/bookings") },
-    { title: t("app.admin.totalCustomers", "Total Customers"),    value: String(filteredStats.totalCustomers),                 change: "+9%",  positive: true,  icon: Users,        onClick: () => navigate("/customers-overview") },
-    { title: t("app.admin.avgBookingValue", "Avg. Booking Value"), value: `₹${filteredStats.avgBookingValue.toLocaleString("en-IN")}`, change: "+5%",  positive: true,  icon: TrendingUp,   onClick: () => navigate("/avg-booking-value") },
+    { title: t("app.admin.totalRevenue", "Total Revenue"), value: fmtRevenue(filteredStats.totalRevenue), change: "+18%", positive: true, icon: IndianRupee, onClick: () => navigate("/revenue") },
+    { title: t("app.admin.totalBookings", "Total Bookings"), value: String(filteredStats.totalBookings), change: "+12%", positive: true, icon: CalendarDays, onClick: () => navigate("/bookings") },
+    { title: t("app.admin.totalCustomers", "Total Customers"), value: String(filteredStats.totalCustomers), change: "+9%", positive: true, icon: Users, onClick: () => navigate("/customers-overview") },
+    { title: t("app.admin.avgBookingValue", "Avg. Booking Value"), value: `₹${filteredStats.avgBookingValue.toLocaleString("en-IN")}`, change: "+5%", positive: true, icon: TrendingUp, onClick: () => navigate("/avg-booking-value") },
   ];
 
   return (

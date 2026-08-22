@@ -19,7 +19,7 @@ const RED = "#F87171";
 
 import React from "react";
 
-const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const OCCASION_COLORS = [GOLD, BLUE, GREEN, PURPLE, RED];
 
 type RevenuePoint = { month: string; revenue: number; target: number };
@@ -93,8 +93,8 @@ export default function AnalyticsPage() {
         const revenueRows = await reportsApi.revenue(startISO, endISO);
         const revenueSeries = Array.isArray(revenueRows)
           ? revenueRows
-              .map((r: any) => ({ month: String(r.day ?? ""), revenue: Number(r.total ?? 0), target: 0 }))
-              .filter((x: any) => x.month)
+            .map((r: any) => ({ month: String(r.day ?? ""), revenue: Number(r.total ?? 0), target: 0 }))
+            .filter((x: any) => x.month)
           : [];
 
         // Booking trend (counts by status)
@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
 
         // Fetch suite performance radar data
         const token = localStorage.getItem('accessToken');
-        const backendBase = import.meta.env.DEV ? 'http://localhost:5001' : 'https://api.vibenests.in';
+        const backendBase = import.meta.env.DEV ? 'http://localhost:5000' : 'https://api.vibenests.in';
         const perfRes = await fetch(`${backendBase}/reports/suite-performance?start=${startISO}&end=${endISO}`, {
           headers: {
             'Content-Type': 'application/json',
@@ -187,12 +187,12 @@ export default function AnalyticsPage() {
   // Map backend raw data to scores out of 100 for the radar rendering
   const radarData = RADAR_METRICS.map((metric) => {
     const row: Record<string, string | number> = { metric };
-    
+
     suitePerformance.forEach((sp) => {
       const suiteKey = String(sp.suiteId);
       let rawVal = 0;
       let score = 0;
-      
+
       if (metric === "Bookings") {
         rawVal = sp.bookings || 0;
         score = Math.min(100, Math.round((rawVal / 50) * 100));
@@ -209,11 +209,11 @@ export default function AnalyticsPage() {
         rawVal = sp.repeat || 0;
         score = Math.min(100, Math.round((rawVal / 10) * 100));
       }
-      
+
       row[suiteKey] = score;
       row[`${suiteKey}_raw`] = rawVal;
     });
-    
+
     return row;
   });
 
@@ -230,15 +230,15 @@ export default function AnalyticsPage() {
 
   const radarSeries = hassuites
     ? suites.map((s, i) => ({
-        id: String(s.id),
-        name: s.name,
-        color: [GOLD, BLUE, GREEN, PURPLE, RED][i % 5],
-        opacity: i === 0 ? 0.15 : 0.1
-      }))
+      id: String(s.id),
+      name: s.name,
+      color: [GOLD, BLUE, GREEN, PURPLE, RED][i % 5],
+      opacity: i === 0 ? 0.15 : 0.1
+    }))
     : [
-        { id: "Suite A", name: "Suite A", color: GOLD, opacity: 0.15 },
-        { id: "Suite B", name: "Suite B", color: BLUE, opacity: 0.1 }
-      ];
+      { id: "Suite A", name: "Suite A", color: GOLD, opacity: 0.15 },
+      { id: "Suite B", name: "Suite B", color: BLUE, opacity: 0.1 }
+    ];
 
   return (
     <div className="flex-1 overflow-y-auto">

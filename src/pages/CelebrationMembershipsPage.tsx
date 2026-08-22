@@ -3,6 +3,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { membershipsApi, suitesApi } from "@/lib/api";
 import { Edit3, CheckCircle, XCircle, Search, Calendar, CreditCard, User, Award, ShieldAlert, Check, Plus, Minus } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 interface MembershipPlanType {
   id: number;
@@ -161,9 +162,10 @@ export default function CelebrationMembershipsPage() {
     if (!window.confirm("Are you sure you want to delete this celebration package? All active subscriptions to this package will remain active until expiry.")) return;
     try {
       await membershipsApi.removePlan(id);
+      toast.success("Celebration package deleted successfully.");
       fetchPlans();
     } catch (err: any) {
-      alert(err.message || "Failed to delete package");
+      toast.error(err.message || "Failed to delete package");
     }
   };
 
@@ -205,14 +207,17 @@ export default function CelebrationMembershipsPage() {
 
       if (modalMode === "create") {
         await membershipsApi.createPlan(payload);
+        toast.success("Celebration package created successfully!");
       } else {
         if (!editingPlan) return;
         await membershipsApi.updatePlan(editingPlan.id, payload);
+        toast.success("Celebration package updated successfully!");
       }
       setIsEditModalOpen(false);
       fetchPlans();
     } catch (err: any) {
       setUpdateError(err.message || `Failed to ${modalMode === "create" ? "create" : "update"} package`);
+      toast.error(err.message || `Failed to ${modalMode === "create" ? "create" : "update"} package`);
     } finally {
       setUpdating(false);
     }

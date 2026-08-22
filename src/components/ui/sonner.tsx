@@ -9,15 +9,18 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
+            "group toast group-[.toaster]:bg-[oklch(0.13_0.025_260)] group-[.toaster]:text-foreground group-[.toaster]:border group-[.toaster]:border-white/15 group-[.toaster]:shadow-2xl group-[.toaster]:backdrop-blur-xl group-[.toaster]:rounded-xl group-[.toaster]:font-sans group-[.toaster]:px-4 group-[.toaster]:py-3.5",
+          description: "group-[.toast]:text-muted-foreground text-xs",
           actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
       }}
+      duration={3500}
+      closeButton
       {...props}
     />
   );
 };
 
 export { Toaster };
+

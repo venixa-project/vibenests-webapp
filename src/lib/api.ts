@@ -1,6 +1,6 @@
 import i18n from '../i18n';
 
-export const BASE_URL = import.meta.env.DEV ? 'http://localhost:5001' : 'https://api.vibenests.in';
+export const BASE_URL = import.meta.env.DEV ? 'http://localhost:5000' : 'https://api.vibenests.in';
 const BASE = BASE_URL;
 
 function getToken() {
@@ -253,6 +253,8 @@ export const reportsApi = {
 export const offersApi = {
   getAll: () => request<{ data: any[]; total: number }>('/offers'),
   getActive: () => request<any[]>('/offers/active'),
+  getMySpecialOffers: () => request<any[]>('/offers/my-special-offers'),
+  getUserOffers: (userId: number) => request<any[]>(`/offers/user/${userId}`),
   create: (body: any) => request<any>('/offers', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: any) => request<any>(`/offers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   remove: (id: number) => request<any>(`/offers/${id}`, { method: 'DELETE' }),
@@ -261,6 +263,11 @@ export const offersApi = {
 export const couponsApi = {
   getAll: () => request<{ data: any[]; total: number }>('/coupons'),
   getActive: () => request<any[]>('/coupons/active'),
+  validate: (body: { code: string; bookingAmount: number }) =>
+    request<{ valid: boolean; discountAmount: number; coupon: any; message?: string }>('/coupons/validate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   create: (body: any) => request<any>('/coupons', { method: 'POST', body: JSON.stringify(body) }),
   remove: (id: number) => request<any>(`/coupons/${id}`, { method: 'DELETE' }),
 };

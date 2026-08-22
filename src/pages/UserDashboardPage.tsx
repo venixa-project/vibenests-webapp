@@ -6,7 +6,7 @@ import {
   Tag, UserCircle, User, HelpCircle, LogOut, BedDouble,
   MapPin, ChevronRight, Star, CreditCard, Phone, MessageSquare,
   ArrowUpRight, CheckCircle2, XCircle, Hourglass, Bell,
-  Users, Wifi, Tv, Wind, Music, Camera, Coffee, Cake, Sparkles,
+  Users, Wifi, Tv, Wind, Music, Camera, Coffee, Cake, Sparkles, PartyPopper,
   Search, TrendingUp, TrendingDown, BarChart3, Eye, RefreshCw, RotateCcw,
   Building2, Smartphone, DollarSign, ArrowDownLeft, ArrowUpLeft,
   Heart, ChevronLeft, Menu,
@@ -1421,6 +1421,7 @@ function DashboardView({ onNavigate, referralStats, refreshReferrals }: { onNavi
   const upcomingSuites = suites.filter((s) => s.status === "Inactive");
   const [dashboardSelected, setDashboardSelected] = useState<Booking | null>(null);
   const [dashboardBookings, setDashboardBookings] = useState<Booking[]>([]);
+  const [userSpecialOffers, setUserSpecialOffers] = useState<any[]>([]);
 
   useEffect(() => {
     bookingsApi.getAll().then((list) => {
@@ -1439,7 +1440,16 @@ function DashboardView({ onNavigate, referralStats, refreshReferrals }: { onNavi
         }));
       setDashboardBookings(mapped);
     }).catch(() => { });
+
+    offersApi.getMySpecialOffers().then((res) => {
+      if (Array.isArray(res) && res.length > 0) {
+        setUserSpecialOffers(res);
+      }
+    }).catch(() => { });
   }, []);
+
+  const topOffer = userSpecialOffers.length > 0 ? userSpecialOffers[0] : null;
+  const topDiscount = topOffer ? (topOffer.discountType === 'percentage' ? `${topOffer.discountValue}% OFF` : `₹${topOffer.discountValue} OFF`) : '';
 
   const statsTranslated = [
     // { label: t("app.userDashboard.totalBookings", "Total Bookings"), value: "12",    icon: CalendarDays },
@@ -1489,13 +1499,58 @@ function DashboardView({ onNavigate, referralStats, refreshReferrals }: { onNavi
             {t("app.userDashboard.bookYourSuite", "Book Your Suite")} <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-        {/* Loyalty points badge */}
-        {/* <div className="absolute right-8 bottom-6 hidden md:block z-10"> */}
-        {/* <div className="glass-gold rounded-2xl p-4 text-center min-w-[120px]"> */}
-        {/* <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">{t("app.userDashboard.loyaltyPoints", "Loyalty Points")}</p> */}
-        {/* <p className="font-display text-3xl text-gold">4,820</p> */}
-        {/* </div> */}
-        {/* </div> */}
+
+        {/* Special Offer Corner Celebration Card (Interactive & Stable) */}
+        {topOffer && (
+          <div
+            onClick={() => navigate(`/user/suite-booking?suiteId=${topOffer.suiteId || ''}&specialOfferId=${topOffer.id}`)}
+            className="absolute right-3 bottom-3 sm:right-6 sm:bottom-6 z-20 cursor-pointer group select-none"
+          >
+            <div className="relative overflow-hidden rounded-2xl border border-gold/30 bg-black/85 backdrop-blur-xl p-3 shadow-2xl shadow-black/70 max-w-[240px] transition-all duration-300 group-hover:border-gold/80 group-hover:shadow-gold/20 group-hover:bg-black/95">
+              {/* Celebration Golden Glow Burst (Reveals on Hover) */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-gold/0 via-gold/20 to-amber-500/0 opacity-0 group-hover:opacity-100 blur-sm transition-opacity duration-500 pointer-events-none" />
+
+              {/* Shimmer Light Sweep on Hover */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
+
+              {/* Floating Mini Sparkles (Celebration) */}
+              <span className="absolute top-1.5 right-2 text-[10px] opacity-70 group-hover:opacity-100 group-hover:scale-125 transition-all duration-300">
+                ✨
+              </span>
+              <span className="absolute bottom-2.5 right-2 text-[8px] opacity-0 group-hover:opacity-80 transition-opacity duration-300 text-gold">
+                ✦
+              </span>
+
+              <div className="flex items-start gap-2.5 relative z-10">
+                {/* Celebration Icon with Animated Hover Tilt & Glow */}
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-gold/25 to-amber-500/10 border border-gold/40 flex items-center justify-center shrink-0 mt-0.5 shadow-inner transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110">
+                  <PartyPopper className="h-4 w-4 text-gold group-hover:text-amber-300 transition-colors" />
+                </div>
+
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded-full bg-gold/20 border border-gold/50 text-gold text-[10px] font-black tracking-wider uppercase">
+                      {topDiscount}
+                    </span>
+                  </div>
+
+                  <p className="text-xs font-bold text-foreground truncate group-hover:text-gold transition-colors">
+                    {topOffer.suiteName ? topOffer.suiteName : topOffer.title}
+                  </p>
+
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Special celebration discount waiting for you! 🎉
+                  </p>
+
+                  <div className="pt-1 flex items-center gap-1 text-[10px] font-bold text-gold group-hover:text-amber-300 transition-colors">
+                    <span>Book with Offer</span>
+                    <ChevronRight className="h-3 w-3 group-hover:translate-x-1 transition-transform duration-200" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {/* Referral Card */}
@@ -2690,6 +2745,7 @@ function CelebrationMembershipsView() {
 function OffersView() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"offers" | "coupons">("offers");
   const [copiedCode, setCopiedCode] = useState("");
 
@@ -2701,13 +2757,13 @@ function OffersView() {
     (async () => {
       try {
         setLoading(true);
-        // Use public /coupons/active endpoint (no auth required)
-        const cList = await couponsApi.getActive();
+        // Load active coupons
+        const cList = await couponsApi.getActive().catch(() => []);
         setCoupons(Array.isArray(cList) ? cList : []);
 
-        // Use public /offers/active endpoint (no auth required)
-        const oList = await offersApi.getActive();
-        setOffers(Array.isArray(oList) ? oList : []);
+        // Load special offers specifically assigned to this logged-in user
+        const mySpecial = await offersApi.getMySpecialOffers().catch(() => []);
+        setOffers(Array.isArray(mySpecial) ? mySpecial : []);
       } catch (err) {
         console.warn("Failed to load offers/coupons in user dashboard", err);
       } finally {
@@ -2719,14 +2775,9 @@ function OffersView() {
   function copyCode(code: string) {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
+    toast.success("Coupon code copied to clipboard!");
     setTimeout(() => setCopiedCode(""), 2000);
   }
-
-  // Dynamically generated referral details per user
-  const referralCode = (user?.fullName ? user.fullName.replace(/\s+/g, "").toUpperCase().slice(0, 5) : "VIBE") + (user?.id || "");
-  const friendsCount = String((user?.id || 0) % 4);
-  const bookingsCount = String(Math.max(0, ((user?.id || 0) % 4) - 1));
-  const rewardsEarned = `₹${(Math.max(0, ((user?.id || 0) % 4) - 1) * 500).toLocaleString("en-IN")}`;
 
   if (loading) {
     return (
@@ -2754,7 +2805,7 @@ function OffersView() {
           <button key={tVal} onClick={() => setTab(tVal)}
             className={`px-4 py-2 rounded-lg text-xs font-medium capitalize transition-colors ${tab === tVal ? "bg-gold/20 text-gold" : "text-muted-foreground hover:text-foreground"
               }`}>
-            {tVal === "offers" ? t("app.userDashboard.tabOffers", "Offers") : t("app.userDashboard.tabCoupons", "Coupons")}
+            {tVal === "offers" ? t("app.userDashboard.tabOffers", "Special Offers") : t("app.userDashboard.tabCoupons", "Coupons")}
           </button>
         ))}
       </div>
@@ -2764,20 +2815,38 @@ function OffersView() {
         <div className="grid md:grid-cols-2 gap-4">
           {offers.length === 0 && (
             <div className="col-span-2 text-center py-12 glass-card rounded-2xl border border-white/5">
-              <p className="text-sm text-muted-foreground">{t("app.userDashboard.noOffersAvailable", "No active offers available at the moment.")}</p>
+              <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">{t("app.userDashboard.noOffersAvailable", "No active special offers available at the moment.")}</p>
             </div>
           )}
           {offers.map((o) => {
             const badge = o.discountType === 'percentage' ? `${o.discountValue}% OFF` : `₹${o.discountValue} OFF`;
             const expires = o.endDate ? formatDateStr(o.endDate) : '';
             return (
-              <div key={o.id} className="glass-card rounded-2xl p-5 hover:border-gold/30 transition-colors">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <h4 className="font-display text-lg text-foreground">{o.title}</h4>
-                  <span className="px-2.5 py-1 rounded-full border border-gold/40 text-gold bg-gold/10 text-[10px] font-bold tracking-widest shrink-0">{badge}</span>
+              <div key={o.id} className="glass-card rounded-2xl p-5 hover:border-gold/30 transition-all shadow-md flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <h4 className="font-display text-lg text-foreground font-semibold">{o.title}</h4>
+                    <span className="px-2.5 py-1 rounded-full border border-gold/40 text-gold bg-gold/10 text-xs font-bold tracking-wider shrink-0">{badge}</span>
+                  </div>
+                  {o.suiteName && (
+                    <div className="flex items-center gap-1.5 text-xs text-gold/90 font-medium mb-2 bg-gold/5 border border-gold/15 rounded-lg px-2.5 py-1.5 w-fit">
+                      <BedDouble className="h-3.5 w-3.5" />
+                      <span>Valid for: <strong>{o.suiteName}</strong></span>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground leading-relaxed">{o.description || "Exclusive special discount on your suite booking."}</p>
+                  <p className="text-[11px] text-emerald-400/90 mt-2.5 flex items-center gap-1 font-medium">
+                    <span>✓</span> Valid until booked
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{o.description || "Special offer discount package"}</p>
-                {expires && <p className="text-[11px] text-muted-foreground mt-3">{t("app.userDashboard.validUntil", "Valid until {{date}}", { date: expires })}</p>}
+
+                <button
+                  onClick={() => navigate(`/user/suite-booking?suiteId=${o.suiteId || ''}&specialOfferId=${o.id}`)}
+                  className="mt-4 gold-btn w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01] transition-transform"
+                >
+                  <Sparkles className="h-3.5 w-3.5" /> Book with Special Offer
+                </button>
               </div>
             );
           })}

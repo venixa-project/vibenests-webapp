@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Eye, ArrowLeft, CheckCircle2, XCircle, CalendarDays, Wallet, User, Phone, Mail, Ticket, Copy, Link } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { bookingsApi, suitesApi, refundsApi } from "@/lib/api";
+import { toast } from "sonner";
 // import { bookingsApi, refundsApi } from "@/lib/api";
 
 
@@ -143,6 +144,7 @@ export default function BookingDetailsPage() {
         window.prompt("Copy payment link", link);
       }
       setCopiedLink(link);
+      toast.success("Payment link copied to clipboard!");
       window.setTimeout(() => setCopiedLink(null), 1600);
     } catch {
       window.prompt("Copy payment link", link);
@@ -259,11 +261,11 @@ export default function BookingDetailsPage() {
                           try {
                             setActionLoading(true);
                             await refundsApi.process(booking.refundRequest.id, 'approve');
-                            alert("Cancellation and refund approved!");
+                            toast.success("Cancellation and refund approved!");
                             const resp = await bookingsApi.getById(booking.id);
                             setBooking(resp);
                           } catch (e: any) {
-                            alert(e.message || "Failed to approve");
+                            toast.error(e.message || "Failed to approve");
                           } finally {
                             setActionLoading(false);
                           }
@@ -278,17 +280,17 @@ export default function BookingDetailsPage() {
                           const reason = window.prompt("Reason for rejection:");
                           if (reason === null) return;
                           if (!reason.trim()) {
-                            alert("Rejection reason is required.");
+                            toast.error("Rejection reason is required.");
                             return;
                           }
                           try {
                             setActionLoading(true);
                             await refundsApi.process(booking.refundRequest.id, 'reject', reason);
-                            alert("Cancellation request rejected.");
+                            toast.success("Cancellation request rejected.");
                             const resp = await bookingsApi.getById(booking.id);
                             setBooking(resp);
                           } catch (e: any) {
-                            alert(e.message || "Failed to reject");
+                            toast.error(e.message || "Failed to reject");
                           } finally {
                             setActionLoading(false);
                           }
@@ -544,7 +546,7 @@ export default function BookingDetailsPage() {
                       const reason = window.prompt("Enter cancellation reason:");
                       if (reason === null) return;
                       if (!reason.trim()) {
-                        alert("Cancellation reason is required.");
+                        toast.error("Cancellation reason is required.");
                         return;
                       }
 
@@ -553,8 +555,10 @@ export default function BookingDetailsPage() {
                         setActionError("");
                         const resp = await bookingsApi.cancel(booking.id, { reason });
                         setBooking(resp);
+                        toast.success("Booking cancelled successfully.");
                       } catch (e: any) {
                         setActionError(e?.message || "Failed to cancel booking");
+                        toast.error(e?.message || "Failed to cancel booking");
                       } finally {
                         setActionLoading(false);
                       }
@@ -573,8 +577,10 @@ export default function BookingDetailsPage() {
                         setActionError("");
                         const resp = await bookingsApi.updateStatus(booking.id, "confirmed");
                         setBooking(resp);
+                        toast.success("Booking confirmed successfully.");
                       } catch (e: any) {
                         setActionError(e?.message || "Failed to confirm booking");
+                        toast.error(e?.message || "Failed to confirm booking");
                       } finally {
                         setActionLoading(false);
                       }
@@ -594,7 +600,7 @@ export default function BookingDetailsPage() {
                       const reason = window.prompt("Enter cancellation reason:");
                       if (reason === null) return;
                       if (!reason.trim()) {
-                        alert("Cancellation reason is required.");
+                        toast.error("Cancellation reason is required.");
                         return;
                       }
 
@@ -603,8 +609,10 @@ export default function BookingDetailsPage() {
                         setActionError("");
                         const resp = await bookingsApi.cancel(booking.id, { reason });
                         setBooking(resp);
+                        toast.success("Booking cancelled successfully.");
                       } catch (e: any) {
                         setActionError(e?.message || "Failed to cancel booking");
+                        toast.error(e?.message || "Failed to cancel booking");
                       } finally {
                         setActionLoading(false);
                       }
@@ -624,8 +632,10 @@ export default function BookingDetailsPage() {
                         // confirmed -> check-out (completed in backend)
                         const resp = await bookingsApi.updateStatus(booking.id, "completed");
                         setBooking(resp);
+                        toast.success("Booking checked-out successfully.");
                       } catch (e: any) {
                         setActionError(e?.message || "Failed to check-out booking");
+                        toast.error(e?.message || "Failed to check-out booking");
                       } finally {
                         setActionLoading(false);
                       }
@@ -647,7 +657,7 @@ export default function BookingDetailsPage() {
                       const reason = window.prompt("Enter cancellation reason:");
                       if (reason === null) return;
                       if (!reason.trim()) {
-                        alert("Cancellation reason is required.");
+                        toast.error("Cancellation reason is required.");
                         return;
                       }
 
@@ -656,8 +666,10 @@ export default function BookingDetailsPage() {
                         setActionError("");
                         const resp = await bookingsApi.cancel(booking.id, { reason });
                         setBooking(resp);
+                        toast.success("Booking cancelled successfully.");
                       } catch (e: any) {
                         setActionError(e?.message || "Failed to cancel booking");
+                        toast.error(e?.message || "Failed to cancel booking");
                       } finally {
                         setActionLoading(false);
                       }
@@ -677,8 +689,10 @@ export default function BookingDetailsPage() {
                         await bookingsApi.updateStatus(booking.id, "completed");
                         const resp = await bookingsApi.getById(booking.id);
                         setBooking(resp);
+                        toast.success("Booking checked-out successfully.");
                       } catch (e: any) {
                         setActionError(e?.message || "Failed to check-out booking");
+                        toast.error(e?.message || "Failed to check-out booking");
                       } finally {
                         setActionLoading(false);
                       }

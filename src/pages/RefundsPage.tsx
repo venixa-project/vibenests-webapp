@@ -6,6 +6,7 @@ import {
   ArrowDownLeft, Sparkles, Download, AlertTriangle, Clock, Eye,
   Save, Settings,
 } from "lucide-react";
+import { toast } from "sonner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type RefundStatus = 'pending' | 'under_review' | 'approved' | 'processing' | 'refunded' | 'rejected' | 'cancelled';
@@ -66,8 +67,9 @@ function OverrideModal({ refund, defaultTab, onClose, onDone }: { refund: any; d
     setLoading(true); setErr('');
     try {
       await refundsApi.approve(refund.id, { selectedPercentage: +pct, adminNotes: notes });
+      toast.success(`Refund of ${pct}% approved successfully!`);
       onDone();
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setErr(e.message); toast.error(e.message || "Failed to approve refund"); } finally { setLoading(false); }
   };
 
   const handleReject = async () => {
@@ -75,8 +77,9 @@ function OverrideModal({ refund, defaultTab, onClose, onDone }: { refund: any; d
     setLoading(true); setErr('');
     try {
       await refundsApi.reject(refund.id, { rejectionReason: reason });
+      toast.success("Refund rejected successfully.");
       onDone();
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setErr(e.message); toast.error(e.message || "Failed to reject refund"); } finally { setLoading(false); }
   };
 
   const handleComplete = async () => {
@@ -84,8 +87,9 @@ function OverrideModal({ refund, defaultTab, onClose, onDone }: { refund: any; d
     setLoading(true); setErr('');
     try {
       await refundsApi.complete(refund.id, { referenceId });
+      toast.success("Refund marked as refunded (completed)!");
       onDone();
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setErr(e.message); toast.error(e.message || "Failed to complete refund"); } finally { setLoading(false); }
   };
 
   return (
@@ -255,11 +259,12 @@ export default function RefundsPage() {
         label: 'Refund % (24–72 hours)'
       });
 
-      alert("Refund policy percentages saved successfully!");
+      toast.success("Refund policy percentages saved successfully!");
       setEditingPolicy(false);
       loadPolicy();
     } catch (err: any) {
       setPolicyError(err.message || "Failed to save policy percentages.");
+      toast.error(err.message || "Failed to save policy percentages.");
     } finally {
       setSavingPolicy(false);
     }

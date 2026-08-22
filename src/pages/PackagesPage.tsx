@@ -6,6 +6,7 @@ import {
   Package, Users, IndianRupee, CalendarDays, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 type Amenity = string;
 const AMENITY_OPTIONS: Amenity[] = ["Balloons", "Cake", "Decoration", "Music", "LED Lights"];
@@ -111,8 +112,13 @@ export default function PackagesPage() {
   function duplicate(p: Package) {
     const newId = `PKG${String(packages.length + 1).padStart(3, "0")}`;
     setPackages((prev) => [...prev, { ...p, id: newId, name: `${p.name} (Copy)`, bookings: 0 }]);
+    toast.success("Package duplicated successfully!");
   }
-  function deletePackage(id: string) { setPackages((prev) => prev.filter((p) => p.id !== id)); }
+  function deletePackage(id: string) {
+    if (!window.confirm("Are you sure you want to delete this package?")) return;
+    setPackages((prev) => prev.filter((p) => p.id !== id));
+    toast.success("Package deleted successfully!");
+  }
 
   function validate() {
     const e: typeof errors = {};
@@ -128,9 +134,11 @@ export default function PackagesPage() {
     if (!validate()) return;
     if (editId) {
       setPackages((prev) => prev.map((p) => p.id === editId ? { ...p, ...form } : p));
+      toast.success("Package updated successfully!");
     } else {
       const newId = `PKG${String(packages.length + 1).padStart(3, "0")}`;
       setPackages((prev) => [...prev, { id: newId, bookings: 0, ...form }]);
+      toast.success("Package created successfully!");
     }
     setPanelOpen(false);
   }

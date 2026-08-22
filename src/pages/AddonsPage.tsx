@@ -3,6 +3,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { Plus, Search, Pencil, Trash2, X, ImagePlus } from "lucide-react";
 import { addonsApi } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 type Addon = {
   id: number;
@@ -124,25 +125,31 @@ export default function AddonsPage() {
       setLoading(true);
       if (editId) {
         await addonsApi.update(editId, payload);
+        toast.success("Add-on updated successfully!");
       } else {
         await addonsApi.create(payload);
+        toast.success("Add-on created successfully!");
       }
       setShowModal(false);
       await fetchAddons();
     } catch (e: any) {
       setError(e?.message || "Failed to save add-on");
+      toast.error(e?.message || "Failed to save add-on");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleDelete(id: number) {
+    if (!window.confirm("Are you sure you want to delete this add-on?")) return;
     try {
       setLoading(true);
       await addonsApi.remove(id);
+      toast.success("Add-on deleted successfully!");
       await fetchAddons();
     } catch (e: any) {
       setError(e?.message || "Failed to delete add-on");
+      toast.error(e?.message || "Failed to delete add-on");
     } finally {
       setLoading(false);
     }
