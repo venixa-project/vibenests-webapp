@@ -12,6 +12,7 @@ export type Booking = {
   totalAmount?: number;
   fullPaymentReceived?: boolean;
   paymentMode?: string;
+  bookedBy?: string;
   rescheduleCount?: number;
 };
 
@@ -53,6 +54,7 @@ function mapApiBooking(b: any): Booking {
     totalAmount: Number(b.totalAmount || 0),
     fullPaymentReceived: !!b.fullPaymentReceived,
     paymentMode: b.paymentMode || '',
+    bookedBy: b.bookedBy || 'guest',
     rescheduleCount: b.rescheduleCount || 0,
   };
 }

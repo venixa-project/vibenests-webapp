@@ -129,6 +129,7 @@ export const bookingsApi = {
   getById: (id: string | number) => request<any>(`/bookings/${id}`),
   create: (body: any) => request<any>('/bookings', { method: 'POST', body: JSON.stringify(body) }),
   adminCreate: (body: any) => request<any>('/bookings/admin', { method: 'POST', body: JSON.stringify(body) }),
+  manualCreate: (body: any) => request<any>('/bookings/manual-entry', { method: 'POST', body: JSON.stringify(body) }),
   updateStatus: (id: number, status: string) =>
     request<any>(`/bookings/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   cancel: (id: number, body?: { reason: string }) =>

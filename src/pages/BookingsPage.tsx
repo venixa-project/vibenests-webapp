@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Filter, Download, Plus, X, Check, ChevronRight, ChevronLeft, Eye, Clock, Sparkles, Tag, Percent } from "lucide-react";
+import { Search, Filter, Download, Plus, X, Check, ChevronRight, ChevronLeft, Eye, Clock, Sparkles, Tag, Percent, ClipboardPen } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DateRangePicker } from "@/components/admin/DateRangePicker";
 import { useAppData } from "@/components/admin/AppDataContext";
@@ -8,6 +8,7 @@ import { suitesApi, addonsApi, bookingsApi, refundsApi, usersApi, offersApi, cou
 import { useTranslation } from "react-i18next";
 import { exportToCSV } from "@/lib/csvExport";
 import { toast } from "sonner";
+import { ManualBookingModal } from "@/components/admin/ManualBookingModal";
 
 const statusStyle: Record<string, string> = {
   Confirmed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -876,6 +877,7 @@ export default function BookingsPage() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [showNewBooking, setShowNewBooking] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'bookings' | 'refunds'>('bookings');
   const [refundRequests, setRefundRequests] = useState<any[]>([]);
@@ -973,10 +975,18 @@ export default function BookingsPage() {
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <DateRangePicker value={dateRange} onChange={setDateRange} />
-            <button onClick={() => setShowNewBooking(true)}
-              className="flex items-center gap-2 gold-btn px-4 py-2 rounded-lg text-xs font-semibold">
+            <button
+              onClick={() => setShowManualEntry(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-[var(--gold)]/40 bg-[var(--gold)]/10 text-gold hover:bg-[var(--gold)]/20 shadow-md shadow-gold/10 transition active:scale-95 cursor-pointer"
+            >
+              <ClipboardPen className="h-3.5 w-3.5" /> {t("app.admin.manualEntry", "Manual Entry")}
+            </button>
+            <button
+              onClick={() => setShowNewBooking(true)}
+              className="flex items-center gap-2 gold-btn px-4 py-2 rounded-xl text-xs font-semibold shadow-md shadow-gold/15 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
+            >
               <Plus className="h-3.5 w-3.5" /> {t("app.admin.newBooking", "New Booking")}
             </button>
           </div>
@@ -1176,7 +1186,14 @@ export default function BookingsPage() {
                           <td className="py-3 pr-4 text-gold font-medium">{b.id}</td>
                           <td className="py-3 pr-4">
                             <div className="flex flex-col">
-                              <span className="text-foreground font-medium">{b.guest}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-foreground font-medium">{b.guest}</span>
+                                {b.bookedBy === 'in_person_manual' && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    In-Person
+                                  </span>
+                                )}
+                              </div>
                               {b.email && <span className="text-[11px] text-muted-foreground">{b.email}</span>}
                             </div>
                           </td>
@@ -1241,6 +1258,16 @@ export default function BookingsPage() {
         <NewBookingModal
           onClose={() => setShowNewBooking(false)}
           onCreated={(b) => addBooking(b)}
+        />
+      )}
+
+      {showManualEntry && (
+        <ManualBookingModal
+          onClose={() => setShowManualEntry(false)}
+          onCreated={(b) => {
+            addBooking(b);
+            refresh();
+          }}
         />
       )}
     </div>
