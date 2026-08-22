@@ -12,6 +12,11 @@ export default defineConfig({
     outDir: 'dist-new', // Outputs to a new folder instead of the locked 'dist'
     emptyOutDir: true,
   },
+  preview: {
+    host: "0.0.0.0",
+    port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
+    allowedHosts: true,
+  },
   server: {
     port: 5174,
     proxy: {
