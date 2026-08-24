@@ -1,6 +1,11 @@
 import i18n from '../i18n';
 
-export const BASE_URL = import.meta.env.VITE_API_URL || '';
+export const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' &&
+    !['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? 'https://api.vibenests.in'
+    : '');
 const BASE = BASE_URL;
 
 function getToken() {
@@ -68,10 +73,27 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
       }
       throw new Error('Session expired. Please log in again.');
     }
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || `HTTP ${res.status}`);
+    const text = await res.text().catch(() => '');
+    let body: any = {};
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // Non-JSON response (e.g. 502/503 HTML during Railway redeployment)
+    }
+    throw new Error(
+      body.message ||
+      (res.status === 502 || res.status === 503
+        ? 'Server is starting up or updating. Please try again in a few seconds.'
+        : `HTTP ${res.status}`)
+    );
   }
-  return res.json();
+
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error('Server returned an unexpected response format. Please refresh.');
+  }
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
