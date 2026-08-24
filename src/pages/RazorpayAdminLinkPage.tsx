@@ -39,7 +39,7 @@ export default function RazorpayAdminLinkPage() {
         await loadRazorpayCheckoutScript();
         if (cancelled) return;
 
-        const apiBase = import.meta.env.DEV ? 'http://localhost:5001' : 'https://api.vibenests.in';
+        const apiBase = import.meta.env.DEV ? 'http://localhost:5000' : 'https://api.vibenests.in';
 
         const res = await fetch(`${apiBase}/payments-links-public/payments/create-order-for-link`, {
           method: 'POST',

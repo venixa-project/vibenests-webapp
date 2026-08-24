@@ -17,7 +17,6 @@ import {
   Loader2,
   Calendar,
   Check,
-  HelpCircle,
   Users,
   UserPlus
 } from "lucide-react";
@@ -234,6 +233,8 @@ export default function CommunicationPage() {
     }
   }
 
+  const todayStr = new Date().toLocaleDateString("en-CA");
+
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
       log.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -294,9 +295,9 @@ export default function CommunicationPage() {
       l.content?.replace(/"/g, '""'),
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
-    
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -311,15 +312,9 @@ export default function CommunicationPage() {
       <AdminHeader title={t("app.admin.communicationCenter", "Guest Communication Center")} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              {t("app.admin.communicationTitle", "Guest Communication Center")}
-              <span title="Track guest message logs and outbound notifications">
-                <HelpCircle className="h-4.5 w-4.5 text-muted-foreground/60 cursor-help" />
-              </span>
-            </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {t("app.admin.communicationSub", "Track WhatsApp notifications & guest communication status")}
             </p>
@@ -395,18 +390,21 @@ export default function CommunicationPage() {
 
           <div className="glass-card rounded-2xl p-4 border border-white/5 flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3">
-              
+
               <div className="flex flex-wrap items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs">
                 <Calendar className="h-3.5 w-3.5 text-gold/80" />
-                
+
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] uppercase font-bold text-gold tracking-wider">From:</span>
                   <input
                     type="date"
                     value={fromDate}
-                    max={toDate || undefined}
+                    max={toDate || todayStr}
                     onChange={(e) => {
-                      const newFrom = e.target.value;
+                      let newFrom = e.target.value;
+                      if (newFrom && newFrom > todayStr) {
+                        newFrom = todayStr;
+                      }
                       setFromDate(newFrom);
                       if (toDate && newFrom > toDate) {
                         setToDate(newFrom);
@@ -423,8 +421,12 @@ export default function CommunicationPage() {
                     type="date"
                     value={toDate}
                     min={fromDate || undefined}
+                    max={todayStr}
                     onChange={(e) => {
-                      const newTo = e.target.value;
+                      let newTo = e.target.value;
+                      if (newTo && newTo > todayStr) {
+                        newTo = todayStr;
+                      }
                       if (fromDate && newTo < fromDate) {
                         setToDate(fromDate);
                       } else {
@@ -495,7 +497,7 @@ export default function CommunicationPage() {
           </div>
 
           <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
-            
+
             <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
               <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
                 <div>
@@ -564,9 +566,28 @@ export default function CommunicationPage() {
                               </div>
                             </td>
                             <td className="px-5 py-4">
-                              <span className="bg-white/5 border border-white/10 rounded-full px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                {log.messageType}
-                              </span>
+                              {(() => {
+                                const type = log.messageType || "";
+                                let badgeColor = "bg-white/5 border-white/10 text-muted-foreground";
+                                if (type.includes("OTP")) {
+                                  badgeColor = "bg-amber-500/15 border-amber-500/30 text-amber-300";
+                                } else if (type.includes("Booking")) {
+                                  badgeColor = "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
+                                } else if (type.includes("Payment")) {
+                                  badgeColor = "bg-sky-500/15 border-sky-500/30 text-sky-400";
+                                } else if (type.includes("Account")) {
+                                  badgeColor = "bg-purple-500/15 border-purple-500/30 text-purple-400";
+                                } else if (type.includes("Marketing") || type.includes("Celebration")) {
+                                  badgeColor = "bg-indigo-500/15 border-indigo-500/30 text-indigo-400";
+                                } else if (type.includes("Refund")) {
+                                  badgeColor = "bg-rose-500/15 border-rose-500/30 text-rose-400";
+                                }
+                                return (
+                                  <span className={`border rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide ${badgeColor}`}>
+                                    {type || "General Notification"}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-5 py-4">
                               {log.status === "Read" ? (
@@ -762,16 +783,15 @@ export default function CommunicationPage() {
                 </div>
               ) : (
                 <form onSubmit={handleSendSubmit} className="space-y-4">
-                  
+
                   <div className="p-1 rounded-xl bg-black/40 border border-white/10 flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => handleSwitchCustomerMode("existing")}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                        customerMode === "existing"
-                          ? "bg-[var(--gold)] text-black shadow-md font-bold"
-                          : "text-muted-foreground hover:text-white hover:bg-white/5"
-                      }`}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${customerMode === "existing"
+                        ? "bg-[var(--gold)] text-black shadow-md font-bold"
+                        : "text-muted-foreground hover:text-white hover:bg-white/5"
+                        }`}
                     >
                       <Users className="h-4 w-4" /> Existing User
                     </button>
@@ -779,11 +799,10 @@ export default function CommunicationPage() {
                     <button
                       type="button"
                       onClick={() => handleSwitchCustomerMode("new")}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                        customerMode === "new"
-                          ? "bg-[var(--gold)] text-black shadow-md font-bold"
-                          : "text-muted-foreground hover:text-white hover:bg-white/5"
-                      }`}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${customerMode === "new"
+                        ? "bg-[var(--gold)] text-black shadow-md font-bold"
+                        : "text-muted-foreground hover:text-white hover:bg-white/5"
+                        }`}
                     >
                       <UserPlus className="h-4 w-4" /> New User
                     </button>
@@ -801,9 +820,8 @@ export default function CommunicationPage() {
                         <button
                           type="button"
                           onClick={() => setShowUserDropdown((prev) => !prev)}
-                          className={`luxury-input w-full rounded-lg px-3 py-2.5 text-xs flex items-center justify-between text-left cursor-pointer hover:border-[var(--gold)]/50 transition ${
-                            fieldErrors.customer ? "border-rose-500 bg-rose-500/10" : ""
-                          }`}
+                          className={`luxury-input w-full rounded-lg px-3 py-2.5 text-xs flex items-center justify-between text-left cursor-pointer hover:border-[var(--gold)]/50 transition ${fieldErrors.customer ? "border-rose-500 bg-rose-500/10" : ""
+                            }`}
                         >
                           <span className={selectedUserId ? "text-foreground font-semibold" : "text-muted-foreground"}>
                             {selectedUserId
@@ -811,9 +829,8 @@ export default function CommunicationPage() {
                               : `-- Select Registered Customer --`}
                           </span>
                           <ChevronDown
-                            className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
-                              showUserDropdown ? "rotate-180 text-gold" : ""
-                            }`}
+                            className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${showUserDropdown ? "rotate-180 text-gold" : ""
+                              }`}
                           />
                         </button>
 
@@ -842,11 +859,10 @@ export default function CommunicationPage() {
                                         handleSelectRegisteredUser(u);
                                         setShowUserDropdown(false);
                                       }}
-                                      className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between transition cursor-pointer ${
-                                        isSelected
-                                          ? "bg-[var(--gold)]/15 text-gold font-semibold"
-                                          : "text-foreground hover:bg-white/5 hover:text-gold"
-                                      }`}
+                                      className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between transition cursor-pointer ${isSelected
+                                        ? "bg-[var(--gold)]/15 text-gold font-semibold"
+                                        : "text-foreground hover:bg-white/5 hover:text-gold"
+                                        }`}
                                     >
                                       <div>
                                         <span className="font-semibold text-foreground">{uName}</span>
@@ -878,9 +894,8 @@ export default function CommunicationPage() {
                             setRecipientName(e.target.value);
                             clearFieldError("name");
                           }}
-                          className={`luxury-input w-full px-3 py-2.5 rounded-xl text-sm mt-1 ${
-                            fieldErrors.name ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
-                          }`}
+                          className={`luxury-input w-full px-3 py-2.5 rounded-xl text-sm mt-1 ${fieldErrors.name ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                            }`}
                         />
                         {fieldErrors.name && (
                           <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
@@ -901,9 +916,8 @@ export default function CommunicationPage() {
                             setSendPhone(e.target.value.replace(/[^\d+]/g, ""));
                             clearFieldError("phone");
                           }}
-                          className={`luxury-input w-full px-3 py-2.5 rounded-xl text-sm mt-1 ${
-                            fieldErrors.phone ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
-                          }`}
+                          className={`luxury-input w-full px-3 py-2.5 rounded-xl text-sm mt-1 ${fieldErrors.phone ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                            }`}
                         />
                         {fieldErrors.phone && (
                           <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
@@ -950,9 +964,8 @@ export default function CommunicationPage() {
                           setCustomMessage(e.target.value);
                           clearFieldError("message");
                         }}
-                        className={`luxury-input w-full px-3 py-2 rounded-xl text-sm bg-[oklch(0.12_0.02_260)] resize-none ${
-                          fieldErrors.message ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
-                        }`}
+                        className={`luxury-input w-full px-3 py-2 rounded-xl text-sm bg-[oklch(0.12_0.02_260)] resize-none ${fieldErrors.message ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                          }`}
                       />
                       {fieldErrors.message && (
                         <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">

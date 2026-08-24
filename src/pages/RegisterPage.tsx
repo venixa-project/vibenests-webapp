@@ -23,7 +23,7 @@ const CITIES = [
 /* ── Country Codes ─────────────────────────────────── */
 const COUNTRY_CODES = [
   { code: "+91", flag: "🇮🇳", label: "India (+91)" },
-  { code: "+1",  flag: "🇺🇸", label: "USA (+1)" },
+  { code: "+1", flag: "🇺🇸", label: "USA (+1)" },
   { code: "+44", flag: "🇬🇧", label: "UK (+44)" },
   { code: "+61", flag: "🇦🇺", label: "Australia (+61)" },
   { code: "+971", flag: "🇦🇪", label: "UAE (+971)" },
@@ -33,8 +33,8 @@ const COUNTRY_CODES = [
 /* ── Trust badges ───────────────────────────────────── */
 const TRUST_BADGES = [
   { icon: ShieldCheck, key: "securePrivate", label: "Secure & Private", href: "/privacy-policy" },
-  { icon: Star,        key: "exclusiveAccess", label: "Exclusive Access", href: "/privacy-policy" },
-  { icon: Headphones,  key: "support247", label: "24/7 Support",     href: "/contact"        },
+  { icon: Star, key: "exclusiveAccess", label: "Exclusive Access", href: "/privacy-policy" },
+  { icon: Headphones, key: "support247", label: "24/7 Support", href: "/contact" },
 ];
 
 /* ── Validation helpers ─────────────────────────────── */
@@ -107,10 +107,10 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
-  const [cityOpen, setCityOpen]   = useState(false);
-  const [agreed, setAgreed]       = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [success, setSuccess]     = useState(false);
+  const [success, setSuccess] = useState(false);
 
   function set(key: string, val: string) {
     setForm((p) => ({ ...p, [key]: val }));
@@ -405,9 +405,8 @@ export default function RegisterPage() {
                           value={form.dateOfBirth}
                           max={new Date().toISOString().split("T")[0]}
                           onChange={(e) => set("dateOfBirth", e.target.value)}
-                          className={`luxury-input w-full rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground ${
-                            errors.dateOfBirth ? "border-rose-500/50" : ""
-                          }`}
+                          className={`luxury-input w-full rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground ${errors.dateOfBirth ? "border-rose-500/50" : ""
+                            }`}
                           style={{ colorScheme: "dark" }}
                         />
                       </Field>
@@ -419,9 +418,8 @@ export default function RegisterPage() {
                           value={form.marriageDate}
                           max={new Date().toISOString().split("T")[0]}
                           onChange={(e) => set("marriageDate", e.target.value)}
-                          className={`luxury-input w-full rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground ${
-                            errors.marriageDate ? "border-rose-500/50" : ""
-                          }`}
+                          className={`luxury-input w-full rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground ${errors.marriageDate ? "border-rose-500/50" : ""
+                            }`}
                           style={{ colorScheme: "dark" }}
                         />
                       </Field>
@@ -474,9 +472,8 @@ export default function RegisterPage() {
                             value={form.referralCode}
                             onChange={(e) => set("referralCode", e.target.value.toUpperCase())}
                             disabled={!!refCodeFromUrl}
-                            className={`luxury-input w-full rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/50 ${
-                              refCodeFromUrl ? "opacity-60 bg-white/[0.02] border-gold/30 text-gold font-semibold cursor-not-allowed select-none" : ""
-                            }`}
+                            className={`luxury-input w-full rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/50 ${refCodeFromUrl ? "opacity-60 bg-white/[0.02] border-gold/30 text-gold font-semibold cursor-not-allowed select-none" : ""
+                              }`}
                           />
                         </Field>
                       </div>
