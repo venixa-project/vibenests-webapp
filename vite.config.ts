@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
+  envDir: '../vibenests-backend',
   plugins: [react(), tailwindcss(), tsconfigPaths()],
   // Workaround for EPERM when Vite tries to write its temp/bundled config into node_modules.
   // Using a dedicated writable cache folder avoids the blocked .vite-temp path.

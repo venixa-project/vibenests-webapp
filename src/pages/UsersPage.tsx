@@ -3,6 +3,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import {
   Search, Plus, Eye, X, User, Phone, Mail, ShieldOff, Shield,
   CheckCircle2, XCircle, CalendarDays, MailCheck, Loader2,
+  AlertCircle
 } from "lucide-react";
 import { useAppData, type UserType } from "@/components/admin/AppDataContext";
 import { usersApi } from "@/lib/api";
@@ -37,6 +38,16 @@ export default function UsersPage() {
   const [form, setForm]             = useState(emptyForm);
   const [saving, setSaving]         = useState(false);
   const [formError, setFormError]   = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   // view drawer
   const [viewUser, setViewUser]     = useState<DetailUser | null>(null);
@@ -53,6 +64,16 @@ export default function UsersPage() {
   }));
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
+
+  const clearEditFieldError = (field: string) => {
+    setEditFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   // delete confirm
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -75,17 +96,37 @@ export default function UsersPage() {
 
   /* ── Add User ─────────────────────────────────────────────────────────── */
   async function handleSave() {
-    if (!form.name.trim() || !form.email.trim()) { setFormError("Full name and email are required."); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { setFormError("Enter a valid email address."); return; }
-    setSaving(true); setFormError(null);
+    const errors: Record<string, string> = {};
+    if (!form.name.trim()) {
+      errors.name = "Full name is required.";
+    }
+    if (!form.email.trim()) {
+      errors.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      errors.email = "Please enter a valid email address.";
+    }
+    if (form.phone && form.phone.replace(/\D/g, "").length < 10) {
+      errors.phone = "Phone number must be at least 10 digits.";
+    }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
+    setSaving(true);
+    setFormError(null);
     try {
       await usersApi.create({ fullName: form.name, email: form.email, phone: form.phone || undefined });
       refresh();
       setShowAdd(false);
       setForm(emptyForm);
+      setFieldErrors({});
     } catch (err: any) {
       setFormError(err.message || "Failed to create user.");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
   /* ── Block / Unblock ──────────────────────────────────────────────────── */
@@ -116,6 +157,7 @@ export default function UsersPage() {
     const du = u as DetailUser;
     setEditUser(du);
     setEditError(null);
+    setEditFieldErrors({});
     setEditSaving(false);
     setEditForm({
       fullName: du.name || "",
@@ -129,8 +171,16 @@ export default function UsersPage() {
 
   async function saveEdit() {
     if (!editUser) return;
+    const errors: Record<string, string> = {};
     if (!editForm.fullName.trim()) {
-      setEditError("Full name is required.");
+      errors.fullName = "Full name is required.";
+    }
+    if (editForm.phone && editForm.phone.replace(/\D/g, "").length < 10) {
+      errors.phone = "Phone number must be at least 10 digits.";
+    }
+
+    setEditFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -147,6 +197,7 @@ export default function UsersPage() {
       refresh();
       setEditOpen(false);
       setEditUser(null);
+      setEditFieldErrors({});
     } catch (err: any) {
       setEditError(err.message || "Failed to update user.");
     } finally {
@@ -180,7 +231,7 @@ export default function UsersPage() {
 
   /* ── Resend Setup Email ───────────────────────────────────────────────── */
   async function resendSetup() {
-    if (!viewUser) return;
+    if (!viewUser || resending) return;
     setResending(true);
     try {
       await usersApi.resendSetup(viewUser.id);
@@ -217,7 +268,7 @@ export default function UsersPage() {
             {["All", "Active", "Blocked"].map((s) => <option key={s} value={s} className="bg-[oklch(0.13_0.025_260)]">{s === "All" ? t("app.admin.allStatuses","All Statuses") : s === "Active" ? t("app.admin.active","Active") : t("app.admin.blocked","Blocked")}</option>)}
           </select>
           <button onClick={() => { setSearch(""); setStatusFilter("All"); }} className="text-xs text-muted-foreground hover:text-gold transition px-3 py-2 rounded-lg border border-white/10 hover:border-[var(--gold)]/30">{t("app.admin.clear","Clear")}</button>
-          <button onClick={() => { setForm(emptyForm); setFormError(null); setShowAdd(true); }} className="flex items-center gap-2 gold-btn px-4 py-2 rounded-lg text-xs font-semibold ml-auto">
+          <button onClick={() => { setForm(emptyForm); setFormError(null); setFieldErrors({}); setShowAdd(true); }} className="flex items-center gap-2 gold-btn px-4 py-2 rounded-lg text-xs font-semibold ml-auto">
             <Plus className="h-3.5 w-3.5" /> {t("app.admin.addCustomerBtn","Add Customer")}
           </button>
         </div>
@@ -423,11 +474,13 @@ export default function UsersPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] text-muted-foreground uppercase tracking-wide">Full Name *</label>
-                <input value={editForm.fullName} onChange={(e) => setEditForm((f) => ({ ...f, fullName: e.target.value }))} className="luxury-input w-full rounded-lg px-3 py-2.5 text-sm mt-0.5" />
+                <input value={editForm.fullName} onChange={(e) => { setEditForm((f) => ({ ...f, fullName: e.target.value })); clearEditFieldError("fullName"); }} className={`luxury-input w-full rounded-lg px-3 py-2.5 text-sm mt-0.5 ${editFieldErrors.fullName ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""}`} />
+                {editFieldErrors.fullName && <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium"><AlertCircle className="h-3 w-3 shrink-0" /> {editFieldErrors.fullName}</p>}
               </div>
               <div>
                 <label className="text-[11px] text-muted-foreground uppercase tracking-wide">Phone</label>
-                <input value={editForm.phone} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} className="luxury-input w-full rounded-lg px-3 py-2.5 text-sm mt-0.5" />
+                <input value={editForm.phone} onChange={(e) => { setEditForm((f) => ({ ...f, phone: e.target.value })); clearEditFieldError("phone"); }} className={`luxury-input w-full rounded-lg px-3 py-2.5 text-sm mt-0.5 ${editFieldErrors.phone ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""}`} />
+                {editFieldErrors.phone && <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium"><AlertCircle className="h-3 w-3 shrink-0" /> {editFieldErrors.phone}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -504,7 +557,8 @@ export default function UsersPage() {
               ].map(({ label, key, type, placeholder }) => (
                 <div key={key}>
                   <label className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</label>
-                  <input type={type} placeholder={placeholder} value={form[key as keyof typeof form]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} className="luxury-input w-full rounded-lg px-3 py-2.5 text-sm mt-0.5" />
+                  <input type={type} placeholder={placeholder} value={form[key as keyof typeof form]} onChange={(e) => { setForm((f) => ({ ...f, [key]: e.target.value })); clearFieldError(key); }} className={`luxury-input w-full rounded-lg px-3 py-2.5 text-sm mt-0.5 ${fieldErrors[key] ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""}`} />
+                  {fieldErrors[key] && <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium"><AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors[key]}</p>}
                 </div>
               ))}
             </div>

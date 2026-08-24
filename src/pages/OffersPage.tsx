@@ -3,7 +3,8 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import {
   Save, X, Plus, Tag, Settings2, Trash2, Ticket,
   Sparkles, Search, Users, User, CheckCircle2,
-  Clock, BedDouble, ChevronDown, ChevronUp, Check, Infinity as InfinityIcon
+  Clock, BedDouble, ChevronDown, ChevronUp, Check, Infinity as InfinityIcon,
+  AlertCircle
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,17 +26,42 @@ const mapApiCoupon = (c: any) => ({
   status: c.status === 'active' ? 'Active' : c.status === 'inactive' ? 'Inactive' : 'Expired',
 });
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="flex flex-col gap-1"><label className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">{label}</label>{children}</div>;
-}
-
-function Input({ value, onChange, type = "text", placeholder = "", min, max }: { value: string | number; onChange: (v: string) => void; type?: string; placeholder?: string; min?: number; max?: number }) {
-  return <input type={type} value={value} min={min} max={max} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="luxury-input rounded-lg px-3 py-2 text-sm w-full" style={type === "date" ? { colorScheme: "dark" } : undefined} />;
-}
-
-function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { label: string; value: string }[] | string[] }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="luxury-input rounded-lg px-3 py-2 text-sm w-full bg-transparent cursor-pointer">
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">{label}</label>
+      {children}
+      {error && (
+        <p className="mt-0.5 text-[11px] text-rose-400 flex items-center gap-1 font-medium animate-in fade-in duration-150">
+          <AlertCircle className="h-3 w-3 shrink-0" /> {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Input({ value, onChange, type = "text", placeholder = "", min, max, hasError = false }: { value: string | number; onChange: (v: string) => void; type?: string; placeholder?: string; min?: number; max?: number; hasError?: boolean }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      min={min}
+      max={max}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`luxury-input rounded-lg px-3 py-2 text-sm w-full ${hasError ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""}`}
+      style={type === "date" ? { colorScheme: "dark" } : undefined}
+    />
+  );
+}
+
+function Select({ value, onChange, options, hasError = false }: { value: string; onChange: (v: string) => void; options: { label: string; value: string }[] | string[]; hasError?: boolean }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`luxury-input rounded-lg px-3 py-2 text-sm w-full bg-transparent cursor-pointer ${hasError ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""}`}
+    >
       {options.map((opt) => {
         const val = typeof opt === "string" ? opt : opt.value;
         const lbl = typeof opt === "string" ? opt : opt.label;
@@ -84,6 +110,16 @@ export default function OffersPage() {
     status: "Active",
   });
   const [couponSaved, setCouponSaved] = useState(false);
+  const [couponErrors, setCouponErrors] = useState<Record<string, string>>({});
+
+  const clearCouponError = (field: string) => {
+    setCouponErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   // ── Special Offers State ─────────────────────────────────────────────────────
   const [offers, setOffers] = useState<any[]>([]);
@@ -94,6 +130,16 @@ export default function OffersPage() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [creatingOffer, setCreatingOffer] = useState(false);
   const [expandedOfferId, setExpandedOfferId] = useState<number | null>(null);
+  const [offerErrors, setOfferErrors] = useState<Record<string, string>>({});
+
+  const clearOfferError = (field: string) => {
+    setOfferErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   const [newOffer, setNewOffer] = useState({
     name: "",
@@ -141,21 +187,29 @@ export default function OffersPage() {
   }
 
   async function handleAddCoupon() {
+    const errors: Record<string, string> = {};
     if (!newCoupon.code.trim()) {
-      toast.error("Please enter a coupon code.");
-      return;
+      errors.code = "Coupon code is required.";
     }
     const val = Number(newCoupon.value);
     if (!newCoupon.value.trim() || isNaN(val) || val <= 0) {
-      toast.error(
-        newCoupon.type === "Percentage"
-          ? "Please enter a valid discount percentage (e.g. 15%)."
-          : "Please enter a valid discount amount in ₹ (e.g. 500)."
-      );
-      return;
+      errors.value = newCoupon.type === "Percentage"
+        ? "Please enter a valid discount % (1-100)."
+        : "Please enter a valid flat amount in ₹.";
+    } else if (newCoupon.type === "Percentage" && val > 100) {
+      errors.value = "Percentage discount cannot exceed 100%.";
     }
-    if (newCoupon.type === "Percentage" && val > 100) {
-      toast.error("Percentage discount cannot exceed 100%.");
+
+    if (newCoupon.expiry) {
+      const d = new Date(newCoupon.expiry);
+      if (isNaN(d.getTime())) {
+        errors.expiry = "Invalid expiry date.";
+      }
+    }
+
+    setCouponErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error("Please fix highlighted coupon fields.");
       return;
     }
 
@@ -163,11 +217,7 @@ export default function OffersPage() {
       let expiresAt: string | undefined = undefined;
       if (newCoupon.expiry) {
         const d = new Date(newCoupon.expiry);
-        if (!isNaN(d.getTime())) {
-          expiresAt = d.toISOString();
-        } else {
-          throw new Error("Invalid expiry date format");
-        }
+        expiresAt = d.toISOString();
       }
       const payload = {
         code: newCoupon.code.trim().toUpperCase(),
@@ -192,6 +242,7 @@ export default function OffersPage() {
         expiry: "",
         status: "Active",
       });
+      setCouponErrors({});
       toast.success("Coupon added successfully!");
       setCouponSaved(true);
       setTimeout(() => setCouponSaved(false), 3000);
@@ -214,12 +265,14 @@ export default function OffersPage() {
   }, [users, userSearch]);
 
   function toggleUserSelection(userId: number) {
+    clearOfferError("users");
     setSelectedUserIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
     );
   }
 
   function handleSelectAllUsers() {
+    clearOfferError("users");
     if (selectedUserIds.length === filteredUsers.length) {
       setSelectedUserIds([]);
     } else {
@@ -228,17 +281,21 @@ export default function OffersPage() {
   }
 
   async function handleCreateSpecialOffer() {
+    const errors: Record<string, string> = {};
     if (!newOffer.name.trim()) {
-      toast.error("Please enter a title for the Special Offer.");
-      return;
+      errors.name = "Special offer title is required.";
     }
     const pct = Number(newOffer.discountPercent);
     if (!newOffer.discountPercent || isNaN(pct) || pct <= 0 || pct > 100) {
-      toast.error("Please enter a valid discount percentage between 1% and 100%.");
-      return;
+      errors.discountPercent = "Please enter a valid discount % between 1 and 100.";
     }
     if (selectedUserIds.length === 0) {
-      toast.error("Please select at least one user to assign this Special Offer.");
+      errors.users = "Please select at least one customer to assign this offer.";
+    }
+
+    setOfferErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error("Please fix highlighted offer fields.");
       return;
     }
 
@@ -268,6 +325,7 @@ export default function OffersPage() {
         discountPercent: "",
         status: "Active",
       });
+      setOfferErrors({});
       setSelectedUserIds([]);
       setUserSearch("");
       toast.success(`Special offer created & assigned to ${payload.assignedUserIds.length} users!`);
@@ -332,13 +390,18 @@ export default function OffersPage() {
               <Card title={t("app.admin.createNewCoupon", "Create New Coupon")} icon={Ticket}>
                 <div className="space-y-3.5">
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label={t("app.admin.couponCode", "Coupon Code")}>
+                    <Field label={`${t("app.admin.couponCode", "Coupon Code")} *`} error={couponErrors.code}>
                       <input
                         type="text"
                         value={newCoupon.code}
-                        onChange={(e) => setNewCoupon((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                        onChange={(e) => {
+                          setNewCoupon((f) => ({ ...f, code: e.target.value.toUpperCase() }));
+                          clearCouponError("code");
+                        }}
                         placeholder="e.g. VIBE20"
-                        className="luxury-input rounded-lg px-3 py-2 text-sm w-full font-mono tracking-widest uppercase"
+                        className={`luxury-input rounded-lg px-3 py-2 text-sm w-full font-mono tracking-widest uppercase ${
+                          couponErrors.code ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                        }`}
                       />
                     </Field>
                     <Field label={t("app.admin.discountType", "Discount Type")}>
@@ -355,11 +418,12 @@ export default function OffersPage() {
                       />
                     </Field>
                     <Field
-                      label={
+                      label={`${
                         newCoupon.type === "Percentage"
                           ? t("app.admin.discountPercentLabel", "Discount Value (%)")
                           : t("app.admin.discountAmountLabel", "Discount Value (₹)")
-                      }
+                      } *`}
+                      error={couponErrors.value}
                     >
                       <div className="relative">
                         <input
@@ -368,6 +432,7 @@ export default function OffersPage() {
                           max={newCoupon.type === "Percentage" ? 100 : undefined}
                           value={newCoupon.value}
                           onChange={(e) => {
+                            clearCouponError("value");
                             const val = e.target.value;
                             if (newCoupon.type === "Percentage" && Number(val) > 100) {
                               setNewCoupon((f) => ({ ...f, value: "100" }));
@@ -376,7 +441,9 @@ export default function OffersPage() {
                             }
                           }}
                           placeholder={newCoupon.type === "Percentage" ? "e.g. 15 (1 - 100%)" : "e.g. 500"}
-                          className="luxury-input rounded-lg pl-3 pr-10 py-2 text-sm w-full font-medium"
+                          className={`luxury-input rounded-lg pl-3 pr-10 py-2 text-sm w-full font-medium ${
+                            couponErrors.value ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                          }`}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gold pointer-events-none">
                           {newCoupon.type === "Percentage" ? "%" : "₹"}
@@ -412,11 +479,15 @@ export default function OffersPage() {
                         placeholder="e.g. 100"
                       />
                     </Field>
-                    <Field label={t("app.admin.expiryDate", "Expiry Date")}>
+                    <Field label={t("app.admin.expiryDate", "Expiry Date")} error={couponErrors.expiry}>
                       <Input
                         value={newCoupon.expiry}
-                        onChange={(e) => setNewCoupon((f) => ({ ...f, expiry: e }))}
+                        onChange={(e) => {
+                          setNewCoupon((f) => ({ ...f, expiry: e }));
+                          clearCouponError("expiry");
+                        }}
                         type="date"
+                        hasError={!!couponErrors.expiry}
                       />
                     </Field>
                   </div>
@@ -505,10 +576,14 @@ export default function OffersPage() {
                 <Card title="Create Special Offer" subtitle="Target suite & assign users" icon={Sparkles}>
                   <div className="space-y-4">
                     {/* Offer Name */}
-                    <Field label="Special Offer Title *">
+                    <Field label="Special Offer Title *" error={offerErrors.name}>
                       <Input
                         value={newOffer.name}
-                        onChange={(v) => setNewOffer((f) => ({ ...f, name: v }))}
+                        onChange={(v) => {
+                          setNewOffer((f) => ({ ...f, name: v }));
+                          clearOfferError("name");
+                        }}
+                        hasError={!!offerErrors.name}
                         placeholder="e.g. VIP Suite Special Discount"
                       />
                     </Field>
@@ -516,14 +591,14 @@ export default function OffersPage() {
                     {/* Same Row: Suite Selection & Users Selection */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* Select Specific Suite */}
-                      <Field label="Target Suite *">
+                      <Field label="Target Suite">
                         <select
                           value={newOffer.suiteId}
                           onChange={(e) => setNewOffer((f) => ({ ...f, suiteId: e.target.value }))}
                           className="luxury-input rounded-lg px-3 py-2 text-sm w-full bg-transparent cursor-pointer"
                         >
                           <option value="" className="bg-[oklch(0.13_0.025_260)] text-foreground">
-                            ✨ Select Suite...
+                            ✨ All Suites / Any
                           </option>
                           {suites.map((s) => (
                             <option key={s.id} value={s.id} className="bg-[oklch(0.13_0.025_260)] text-foreground">
@@ -534,11 +609,16 @@ export default function OffersPage() {
                       </Field>
 
                       {/* Select Users Trigger (Opens Popup) */}
-                      <Field label="Assign Users *">
+                      <Field label="Assign Users *" error={offerErrors.users}>
                         <button
                           type="button"
-                          onClick={() => setShowUserModal(true)}
-                          className="luxury-input rounded-lg px-3 py-2 text-sm w-full bg-transparent text-left flex items-center justify-between hover:border-[var(--gold)]/50 transition cursor-pointer"
+                          onClick={() => {
+                            setShowUserModal(true);
+                            clearOfferError("users");
+                          }}
+                          className={`luxury-input rounded-lg px-3 py-2 text-sm w-full bg-transparent text-left flex items-center justify-between hover:border-[var(--gold)]/50 transition cursor-pointer ${
+                            offerErrors.users ? "border-rose-500 bg-rose-500/5" : ""
+                          }`}
                         >
                           <div className="flex items-center gap-2 truncate">
                             <Users className="h-4 w-4 text-gold shrink-0" />
@@ -559,13 +639,17 @@ export default function OffersPage() {
 
                     {/* Discount Percentage & Offer Status (Active / Inactive only) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Field label="Discount Percentage (%) *">
+                      <Field label="Discount Percentage (%) *" error={offerErrors.discountPercent}>
                         <Input
                           type="number"
                           min={1}
                           max={100}
                           value={newOffer.discountPercent}
-                          onChange={(v) => setNewOffer((f) => ({ ...f, discountPercent: v }))}
+                          onChange={(v) => {
+                            setNewOffer((f) => ({ ...f, discountPercent: v }));
+                            clearOfferError("discountPercent");
+                          }}
+                          hasError={!!offerErrors.discountPercent}
                           placeholder="e.g. 20"
                         />
                       </Field>

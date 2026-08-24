@@ -5,7 +5,7 @@ import {
   Star, ChevronRight, CheckCircle2, CalendarDays, Clock,
   Users, MapPin, MessageSquare, Sparkles, ThumbsUp,
   LayoutDashboard, BedDouble, Wallet, Tag, UserCircle,
-  HelpCircle, LogOut, Package, History, Bell,
+  HelpCircle, LogOut, Package, History, Bell, AlertCircle
 } from "lucide-react";
 import { LanguageSelector } from "@/components/shared/LanguageSelector";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -491,9 +491,9 @@ export default function WriteReviewPage() {
                             <motion.p
                               initial={{ opacity: 0, y: -4 }}
                               animate={{ opacity: 1, y: 0 }}
-                              className="text-xs text-rose-400 flex items-center gap-1.5"
+                              className="text-xs text-rose-400 flex items-center gap-1.5 font-medium"
                             >
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-400 shrink-0" />
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                               {t("app.userDashboard.ratingRequiredError", "Please rate your overall experience before submitting.")}
                             </motion.p>
                           )}
@@ -537,7 +537,8 @@ export default function WriteReviewPage() {
                         {/* Submit/Cancel Buttons */}
                         <div className="flex flex-col gap-3 pb-8">
                           {submitError && (
-                            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-2 text-center">
+                            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 font-medium">
+                              <AlertCircle className="h-4 w-4 shrink-0" />
                               {submitError}
                             </p>
                           )}

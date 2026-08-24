@@ -9,26 +9,21 @@ import {
   Search,
   Download,
   RotateCcw,
-  Sparkles,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Filter,
-  FileText,
-  History,
-  MessageSquare,
   Phone,
-  User,
-  Plus,
   Loader2,
   Calendar,
   Check,
-  Building,
   HelpCircle,
-  ExternalLink,
+  Users,
+  UserPlus
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import { usersApi, notificationsApi } from "@/lib/api";
 
 interface MessageLog {
   id: number;
@@ -45,36 +40,26 @@ interface MessageLog {
   content: string;
 }
 
-const TEMPLATES = [
+export const META_TEMPLATES = [
   {
-    id: "booking_confirmed",
-    name: "Booking Confirmation",
-    content: "Hi {{name}}! Your booking is confirmed. Booking ID: #VN{{bookingId}}. We’re excited to host you at VibeNests.",
-    category: "Operations"
+    id: "vibenests_celebration_booking",
+    name: "VibeNests Celebration Booking (Marketing)",
+    metaTemplateName: "vibenests_celebration_booking",
+    category: "Marketing",
+    content: "Welcome to VibeNests, {{1}}! ✨\n\nMake your celebrations unforgettable in our private luxury suites for Birthdays, Anniversaries & Candlelight Dates. Choose your preferred suite and book now.\n\nThank you for choosing VibeNests !\nLuxury Private Celebration Suites",
+    buttonLabel: "Book Now",
+    buttonUrl: "https://celebrations.vibenests.in",
+    status: "Meta Approved"
   },
   {
-    id: "payment_success",
-    name: "Payment Received",
-    content: "Hi {{name}}! Payment successful. Your booking is confirmed. Amount: {{amount}}. See you soon at VibeNests!",
-    category: "Transactions"
-  },
-  {
-    id: "otp_verification",
-    name: "OTP Verification",
-    content: "Your VibeNests OTP is {{otp}}. Valid for 5 minutes. Do not share this with anyone.",
-    category: "System"
-  },
-  {
-    id: "refund_status",
-    name: "Refund Initiated",
-    content: "Hi {{name}}! Your refund request of {{amount}} for booking #VN{{bookingId}} has been initiated. We'll update you once completed.",
-    category: "Refunds"
-  },
-  {
-    id: "offer_promotion",
-    name: "Offer Promotion",
-    content: "New offer is live at VibeNests: {{offerName}}. Check out the latest deals today!",
-    category: "Marketing"
+    id: "login_otp",
+    name: "Login OTP Verification (Authentication)",
+    metaTemplateName: "login_otp",
+    category: "Authentication",
+    content: "Your VibeNests verification code is {{1}}. Valid for 5 minutes. Do not share this code with anyone.",
+    buttonLabel: null,
+    buttonUrl: null,
+    status: "Meta Approved"
   }
 ];
 
@@ -84,13 +69,11 @@ export default function CommunicationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<"center" | "templates" | "history">("center");
-
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
-  const [dateFilter, setDateFilter] = useState("All");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -98,9 +81,15 @@ export default function CommunicationPage() {
 
   // Modals / Inputs
   const [showSendModal, setShowSendModal] = useState(false);
+  const [customerMode, setCustomerMode] = useState<"existing" | "new">("existing");
+  const [users, setUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [recipientName, setRecipientName] = useState("");
   const [sendPhone, setSendPhone] = useState("");
-  const [sendTemplate, setSendTemplate] = useState("booking_confirmed");
+  const [sendTemplate, setSendTemplate] = useState("vibenests_celebration_booking");
   const [customMessage, setCustomMessage] = useState("");
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState(false);
@@ -108,32 +97,59 @@ export default function CommunicationPage() {
   // Active View message modal
   const [selectedMessage, setSelectedMessage] = useState<MessageLog | null>(null);
 
-  const selectedTemplateObj = TEMPLATES.find((t) => t.id === sendTemplate);
-  const previewText = (selectedTemplateObj?.content || "")
-    .replace("{{name}}", "Rahul Sharma")
-    .replace("{{bookingId}}", "VN1024")
-    .replace("{{amount}}", "₹12,500")
-    .replace("{{otp}}", "482015")
-    .replace("{{offerName}}", "Monsoon Escape");
-
-  const BASE_URL = "http://localhost:4000";
-
   useEffect(() => {
     fetchLogs();
+    fetchUsers();
   }, []);
+
+  async function fetchUsers() {
+    try {
+      const data = await usersApi.getAll();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn("Failed to load users for WhatsApp notification", err);
+    }
+  }
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  function handleSelectRegisteredUser(u: any) {
+    setSelectedUserId(String(u.id));
+    const name = u.fullName || u.name || "Valued Guest";
+    setRecipientName(name);
+    let rawPhone = u.phone || "";
+    if (rawPhone && !rawPhone.startsWith("91") && rawPhone.length === 10) {
+      rawPhone = "91" + rawPhone;
+    }
+    setSendPhone(rawPhone);
+    clearFieldError("customer");
+    clearFieldError("phone");
+    clearFieldError("name");
+  }
+
+  function handleSwitchCustomerMode(mode: "existing" | "new") {
+    setCustomerMode(mode);
+    setFieldErrors({});
+    if (mode === "new") {
+      setSelectedUserId("");
+      setRecipientName("");
+      setSendPhone("");
+    }
+  }
 
   async function fetchLogs() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${BASE_URL}/notifications/whatsapp/logs`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-      });
-      if (!response.ok) throw new Error("Failed to load logs");
-      const data = await response.json();
-      setLogs(data);
+      const data = await notificationsApi.getWhatsAppLogs();
+      setLogs(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError(err.message || "Could not retrieve message logs");
     } finally {
@@ -141,108 +157,107 @@ export default function CommunicationPage() {
     }
   }
 
-  // Resend action
   async function handleResend(log: MessageLog) {
     try {
-      const response = await fetch(`${BASE_URL}/notifications/send/whatsapp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-        body: JSON.stringify({
-          phone: log.mobileNumber,
-          message: log.content,
-          messageType: log.messageType,
-        }),
+      await notificationsApi.sendWhatsApp({
+        phone: log.mobileNumber,
+        message: log.content,
+        messageType: log.messageType,
       });
-      if (response.ok) {
-        // Refresh logs list
-        fetchLogs();
-      }
+      fetchLogs();
     } catch (err) {
       console.error("Resend failed", err);
     }
   }
 
-  // Send WhatsApp Notification submit
   async function handleSendSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!sendPhone) {
-      setSendError("Recipient phone number is required");
+    const errors: Record<string, string> = {};
+
+    if (customerMode === "existing" && !selectedUserId) {
+      errors.customer = "Please select an existing customer from the list.";
+    }
+
+    if (!recipientName.trim()) {
+      errors.name = "Recipient name is required.";
+    }
+
+    const cleanPhone = sendPhone.replace(/\D/g, "");
+    if (!cleanPhone) {
+      errors.phone = "Recipient mobile number is required.";
+    } else if (cleanPhone.length < 10) {
+      errors.phone = "Please enter a valid phone number (at least 10 digits).";
+    }
+
+    if (sendTemplate === "custom" && !customMessage.trim()) {
+      errors.message = "Please enter the custom message content to send.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
-    // Resolve template preview text
-    let messageText = customMessage;
-    const activeTpl = TEMPLATES.find(t => t.id === sendTemplate);
-    if (activeTpl && !customMessage) {
-      messageText = activeTpl.content
-        .replace("{{name}}", "Valued Guest")
-        .replace("{{bookingId}}", "1024")
-        .replace("{{amount}}", "₹12,500")
-        .replace("{{otp}}", "482015")
-        .replace("{{offerName}}", "Monsoon Escape (15% OFF)");
-    }
-
+    setFieldErrors({});
     setSending(true);
     setSendError(null);
+
+    const activeTpl = META_TEMPLATES.find((t) => t.id === sendTemplate);
+    let messageText = customMessage;
+    if (activeTpl && sendTemplate !== "custom") {
+      messageText = activeTpl.content.replace("{{1}}", recipientName || "Guest");
+    }
+
     try {
-      const response = await fetch(`${BASE_URL}/notifications/send/whatsapp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-        body: JSON.stringify({
-          phone: sendPhone,
-          message: messageText,
-          messageType: activeTpl?.name || "Custom",
-        }),
+      await notificationsApi.sendWhatsApp({
+        phone: cleanPhone,
+        message: messageText,
+        messageType: activeTpl?.name || "Custom Message",
+        templateName: sendTemplate,
+        userName: recipientName || "Guest",
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to send WhatsApp message");
-      }
-
       setSendSuccess(true);
-      setSendPhone("");
-      setCustomMessage("");
-      // Refresh list
       fetchLogs();
       setTimeout(() => {
         setShowSendModal(false);
         setSendSuccess(false);
+        setSelectedUserId("");
+        setRecipientName("");
+        setSendPhone("");
+        setCustomMessage("");
       }, 1500);
     } catch (err: any) {
-      setSendError(err.message || "Error sending message");
+      setSendError(err.message || "Failed to dispatch WhatsApp message.");
     } finally {
       setSending(false);
     }
   }
 
-  // Filter logs
   const filteredLogs = logs.filter((log) => {
-    // Search filter
     const matchesSearch =
       log.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.mobileNumber.includes(searchQuery) ||
       (log.content && log.content.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    // Type filter
     const matchesType = typeFilter === "All" || log.messageType === typeFilter;
 
-    // Date range filter helper
-    const matchesDate = true; // Simplified for UI demonstration
+    let matchesDate = true;
+    if (fromDate || toDate) {
+      const logDateStr = new Date(log.sentOn).toISOString().slice(0, 10);
+      if (fromDate && logDateStr < fromDate) {
+        matchesDate = false;
+      }
+      if (toDate && logDateStr > toDate) {
+        matchesDate = false;
+      }
+    }
 
     return matchesSearch && matchesType && matchesDate;
   });
 
-  // Unique lists for dropdowns
   const uniqueTypes = Array.from(new Set(logs.map((l) => l.messageType))).filter(Boolean);
 
-  // Metrics
   const totalCount = logs.length;
   const deliveredLogs = logs.filter((l) => l.status === "Delivered" || l.status === "Read");
   const readLogs = logs.filter((l) => l.status === "Read");
@@ -259,13 +274,11 @@ export default function CommunicationPage() {
   const pendingRate = totalCount > 0 ? Math.round((pendingCount / totalCount) * 100) : 0;
   const failedRate = totalCount > 0 ? Math.round((failedCount / totalCount) * 100) : 0;
 
-  // Pagination logic
   const totalEntries = filteredLogs.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage) || 1;
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedLogs = filteredLogs.slice(startIndex, startIndex + rowsPerPage);
 
-  // Download CSV helper
   const downloadCSV = () => {
     const headers = ["ID", "Guest Name", "Guest Email", "Mobile Number", "Event Name", "Suite Name", "Message Type", "Status", "Sent On", "Content"];
     const rows = filteredLogs.map((l) => [
@@ -299,7 +312,6 @@ export default function CommunicationPage() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         
-        {/* Title Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
@@ -314,634 +326,668 @@ export default function CommunicationPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Header Tabs */}
-            <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 shrink-0">
-              <button
-                onClick={() => setActiveTab("center")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === "center" ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <MessageSquare className="h-3.5 w-3.5 inline mr-1" />
-                Center
-              </button>
-              <button
-                onClick={() => setActiveTab("templates")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === "templates" ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <FileText className="h-3.5 w-3.5 inline mr-1" />
-                Templates
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === "history" ? "bg-[var(--gold)]/10 text-gold border border-[var(--gold)]/20" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <History className="h-3.5 w-3.5 inline mr-1" />
-                Logs
-              </button>
-            </div>
-
-            {/* Send Notification Dropdown Button */}
             <button
               onClick={() => setShowSendModal(true)}
-              className="gold-btn rounded-xl px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-lg shadow-gold/5 shrink-0"
+              className="gold-btn rounded-xl px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-lg shadow-gold/10 shrink-0 cursor-pointer hover:scale-[1.02] transition"
             >
               <Send className="h-3.5 w-3.5" />
-              {t("app.admin.sendNotification", "Send Notification")}
-              <ChevronDown className="h-3.5 w-3.5 border-l border-black/20 pl-0.5 ml-1" />
+              {t("app.admin.sendNotification", "Send WhatsApp Notification")}
             </button>
           </div>
         </div>
 
-        <AnimatePresence mode="wait">
-          {activeTab === "center" && (
-            <motion.div
-              key="center"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-6"
-            >
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                {[
-                  {
-                    title: "Messages Sent",
-                    value: totalCount,
-                    subtitle: "Total messages sent",
-                    icon: Send,
-                    color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
-                  },
-                  {
-                    title: "Delivered",
-                    value: deliveredCount,
-                    subtitle: `${deliveryRate}% of total`,
-                    icon: CheckCircle,
-                    color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-                  },
-                  {
-                    title: "Read",
-                    value: readCount,
-                    subtitle: `${readRate}% of delivered`,
-                    icon: Eye,
-                    color: "text-sky-400 bg-sky-500/10 border-sky-500/20",
-                  },
-                  {
-                    title: "Pending",
-                    value: pendingCount,
-                    subtitle: `${pendingRate}% of total`,
-                    icon: Clock,
-                    color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-                  },
-                  {
-                    title: "Failed",
-                    value: failedCount,
-                    subtitle: `${failedRate}% of total`,
-                    icon: AlertCircle,
-                    color: "text-rose-400 bg-rose-500/10 border-rose-500/20",
-                  },
-                ].map((item, idx) => (
-                  <div
-                    key={idx}
-                    className={`glass-card rounded-2xl p-5 border flex flex-col justify-between ${item.color.split(" ").slice(2).join(" ")} bg-white/3`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{item.title}</span>
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${item.color.split(" ").slice(0, 2).join(" ")} bg-white/5`}>
-                        <item.icon className="h-4 w-4" />
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <p className="text-3xl font-display font-bold text-foreground">{item.value}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{item.subtitle}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Filters Block */}
-              <div className="glass-card rounded-2xl p-4 border border-white/5 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  {/* Date Filter */}
-                  <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs">
-                    <Calendar className="h-3.5 w-3.5 text-gold/80" />
-                    <select
-                      value={dateFilter}
-                      onChange={(e) => setDateFilter(e.target.value)}
-                      className="bg-transparent text-foreground cursor-pointer outline-none font-medium"
-                    >
-                      <option value="All" className="bg-[oklch(0.12_0.02_260)] text-foreground">01 Jun 2026 - 28 Jun 2026</option>
-                      <option value="Today" className="bg-[oklch(0.12_0.02_260)] text-foreground">Today</option>
-                      <option value="Yesterday" className="bg-[oklch(0.12_0.02_260)] text-foreground">Yesterday</option>
-                    </select>
-                  </div>
-
-                  {/* Event Filter */}
-                  <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs">
-                    <Filter className="h-3.5 w-3.5 text-gold/80" />
-                    <select
-                      value={typeFilter}
-                      onChange={(e) => setTypeFilter(e.target.value)}
-                      className="bg-transparent text-foreground cursor-pointer outline-none font-medium"
-                    >
-                      <option value="All" className="bg-[oklch(0.12_0.02_260)] text-foreground">All Events</option>
-                      {uniqueTypes.map((t) => (
-                        <option key={t} value={t} className="bg-[oklch(0.12_0.02_260)] text-foreground">{t}</option>
-                      ))}
-                    </select>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {[
+              {
+                title: "Messages Sent",
+                value: totalCount,
+                subtitle: "Total messages sent",
+                icon: Send,
+                color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+              },
+              {
+                title: "Delivered",
+                value: deliveredCount,
+                subtitle: `${deliveryRate}% of total`,
+                icon: CheckCircle,
+                color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+              },
+              {
+                title: "Read",
+                value: readCount,
+                subtitle: `${readRate}% of delivered`,
+                icon: Eye,
+                color: "text-sky-400 bg-sky-500/10 border-sky-500/20",
+              },
+              {
+                title: "Pending",
+                value: pendingCount,
+                subtitle: `${pendingRate}% of total`,
+                icon: Clock,
+                color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+              },
+              {
+                title: "Failed",
+                value: failedCount,
+                subtitle: `${failedRate}% of total`,
+                icon: AlertCircle,
+                color: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+              },
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className={`glass-card rounded-2xl p-5 border flex flex-col justify-between ${item.color.split(" ").slice(2).join(" ")} bg-white/3`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{item.title}</span>
+                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${item.color.split(" ").slice(0, 2).join(" ")} bg-white/5`}>
+                    <item.icon className="h-4 w-4" />
                   </div>
                 </div>
-
-                {/* Search & Export */}
-                <div className="flex items-center gap-3 w-full md:w-auto md:flex-1 justify-end">
-                  <div className="relative flex-1 md:max-w-xs w-full">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search by guest name or mobile"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="luxury-input w-full pl-9 pr-4 py-2 rounded-xl text-xs"
-                    />
-                  </div>
-
-                  <button
-                    onClick={downloadCSV}
-                    className="flex items-center gap-2 text-xs font-semibold gold-btn px-4 py-2 rounded-xl shadow-md shadow-gold/15 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
-                  >
-                    <Download className="h-4 w-4" />
-                    Export
-                  </button>
+                <div className="mt-4">
+                  <p className="text-3xl font-display font-bold text-foreground">{item.value}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{item.subtitle}</p>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* Two-Column Layout details */}
-              <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
+          <div className="glass-card rounded-2xl p-4 border border-white/5 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              
+              <div className="flex flex-wrap items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs">
+                <Calendar className="h-3.5 w-3.5 text-gold/80" />
                 
-                {/* Main Table Card */}
-                <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-white/5">
-                    <h3 className="font-display text-base font-semibold text-foreground">Communication Details</h3>
-                  </div>
-
-                  {loading ? (
-                    <div className="p-16 text-center space-y-4">
-                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-gold" />
-                      <p className="text-sm text-muted-foreground">Retrieving WhatsApp logs...</p>
-                    </div>
-                  ) : paginatedLogs.length === 0 ? (
-                    <div className="p-16 text-center text-sm text-muted-foreground">
-                      No logs found matching selected filters.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-white/[0.02] border-b border-white/5 text-muted-foreground font-semibold uppercase tracking-wider">
-                            <th className="px-5 py-4">Guest Name</th>
-                            <th className="px-5 py-4">Mobile Number</th>
-                            <th className="px-5 py-4">Message Type</th>
-                            <th className="px-5 py-4">Status</th>
-                            <th className="px-5 py-4">Sent On</th>
-                            <th className="px-5 py-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                          {paginatedLogs.map((log) => {
-                            const initials = log.guestName.split(" ").map(w => w.charAt(0)).join("").slice(0, 2).toUpperCase();
-                            const colors = ["bg-indigo-500/10 text-indigo-400 border-indigo-500/20", "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", "bg-sky-500/10 text-sky-400 border-sky-500/20", "bg-rose-500/10 text-rose-400 border-rose-500/20", "bg-amber-500/10 text-amber-400 border-amber-500/20"];
-                            const colorIndex = log.guestName.charCodeAt(0) % colors.length;
-
-                            return (
-                              <tr key={log.id} className="hover:bg-white/[0.01] transition-colors">
-                                <td className="px-5 py-4">
-                                  <div className="flex items-center gap-3">
-                                    <div className={`h-8 w-8 rounded-full border flex items-center justify-center font-bold text-xs shrink-0 ${colors[colorIndex]}`}>
-                                      {initials}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h4 className="font-semibold text-foreground truncate">{log.guestName}</h4>
-                                      <p className="text-[10px] text-muted-foreground truncate">{log.guestEmail}</p>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-5 py-4">
-                                  <div className="flex items-center gap-1.5 font-mono text-muted-foreground">
-                                    {log.mobileNumber}
-                                    <a
-                                      href={`https://wa.me/${log.mobileNumber.replace(/\+/g, "")}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="p-1 rounded hover:bg-emerald-500/15 text-emerald-400 transition"
-                                      title="Open chat on WhatsApp Web"
-                                    >
-                                      <Phone className="h-3 w-3" />
-                                    </a>
-                                  </div>
-                                </td>
-                                <td className="px-5 py-4">
-                                  <span className="bg-white/5 border border-white/10 rounded-full px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                    {log.messageType}
-                                  </span>
-                                </td>
-                                <td className="px-5 py-4">
-                                  {log.status === "Read" ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-max">
-                                      <Check className="h-3 w-3" /> Read
-                                    </span>
-                                  ) : log.status === "Delivered" ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/20 flex items-center gap-1 w-max">
-                                      <Check className="h-3 w-3" /> Delivered
-                                    </span>
-                                  ) : log.status === "Failed" ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/20 flex items-center gap-1 w-max">
-                                      <AlertCircle className="h-3 w-3" /> Failed
-                                    </span>
-                                  ) : log.status === "Pending" ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20 flex items-center gap-1 w-max">
-                                      <Clock className="h-3 w-3" /> Pending
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/5 text-muted-foreground border border-white/10 flex items-center gap-1 w-max">
-                                      <Send className="h-3 w-3" /> Sent
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-5 py-4 text-muted-foreground whitespace-nowrap">
-                                  {new Date(log.sentOn).toLocaleString("en-IN", {
-                                    day: "numeric",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </td>
-                                <td className="px-5 py-4 text-right">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    <button
-                                      onClick={() => handleResend(log)}
-                                      className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-gold transition"
-                                      title="Resend Notification"
-                                    >
-                                      <RotateCcw className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => setSelectedMessage(log)}
-                                      className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-gold transition"
-                                      title="View Message Body"
-                                    >
-                                      <Eye className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Pagination Footer */}
-                  <div className="px-5 py-4 border-t border-white/5 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalEntries)} of {totalEntries} entries
-                    </span>
-
-                    <div className="flex items-center gap-4">
-                      {/* Rows selector */}
-                      <div className="flex items-center gap-1.5">
-                        <span>Rows per page:</span>
-                        <select
-                          value={rowsPerPage}
-                          onChange={(e) => {
-                            setRowsPerPage(Number(e.target.value));
-                            setCurrentPage(1);
-                          }}
-                          className="bg-white/5 border border-white/10 rounded-lg p-1 text-foreground cursor-pointer"
-                        >
-                          <option value={5} className="bg-[oklch(0.12_0.02_260)]">5</option>
-                          <option value={10} className="bg-[oklch(0.12_0.02_260)]">10</option>
-                          <option value={25} className="bg-[oklch(0.12_0.02_260)]">25</option>
-                        </select>
-                      </div>
-
-                      {/* Page selector buttons */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          disabled={currentPage === 1}
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          className="h-7 w-7 rounded-lg border border-white/5 flex items-center justify-center hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <span className="px-2 font-mono">{currentPage} / {totalPages}</span>
-                        <button
-                          disabled={currentPage === totalPages}
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          className="h-7 w-7 rounded-lg border border-white/5 flex items-center justify-center hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase font-bold text-gold tracking-wider">From:</span>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    max={toDate || undefined}
+                    onChange={(e) => {
+                      const newFrom = e.target.value;
+                      setFromDate(newFrom);
+                      if (toDate && newFrom > toDate) {
+                        setToDate(newFrom);
+                      }
+                      setCurrentPage(1);
+                    }}
+                    className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-foreground cursor-pointer outline-none focus:border-gold/50 transition"
+                  />
                 </div>
 
-                {/* Right Panels */}
-                <div className="space-y-6">
-                  
-                  {/* Delivery Health Pie chart */}
-                  <div className="glass-card rounded-2xl border border-white/5 p-6 space-y-4">
-                    <h3 className="font-display text-sm font-semibold text-foreground">Communication Health</h3>
-                    
-                    {/* Ring Chart */}
-                    <div className="flex justify-center relative py-4">
-                      <svg className="w-32 h-32 transform -rotate-90">
-                        {/* Underlay circle */}
-                        <circle
-                          cx="64"
-                          cy="64"
-                          r="52"
-                          stroke="rgba(255,255,255,0.05)"
-                          strokeWidth="10"
-                          fill="transparent"
-                        />
-                        {/* Progress circle */}
-                        <circle
-                          cx="64"
-                          cy="64"
-                          r="52"
-                          stroke="var(--gold)"
-                          strokeWidth="10"
-                          fill="transparent"
-                          strokeDasharray={326.7}
-                          strokeDashoffset={326.7 - (326.7 * deliveryRate) / 100}
-                          className="transition-all duration-1000 ease-out"
-                        />
-                      </svg>
-                      {/* Centered label */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-bold text-foreground">{deliveryRate}%</span>
-                        <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-semibold">Delivery Rate</span>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase font-bold text-gold tracking-wider">To:</span>
+                  <input
+                    type="date"
+                    value={toDate}
+                    min={fromDate || undefined}
+                    onChange={(e) => {
+                      const newTo = e.target.value;
+                      if (fromDate && newTo < fromDate) {
+                        setToDate(fromDate);
+                      } else {
+                        setToDate(newTo);
+                      }
+                      setCurrentPage(1);
+                    }}
+                    className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-foreground cursor-pointer outline-none focus:border-gold/50 transition"
+                  />
+                </div>
 
-                    <div className="space-y-2 border-t border-white/5 pt-4">
-                      {[
-                        { label: "Delivered", rate: deliveryRate, dot: "bg-emerald-400" },
-                        { label: "Read", rate: readRate, dot: "bg-sky-400" },
-                        { label: "Pending", rate: pendingRate, dot: "bg-amber-400" },
-                        { label: "Failed", rate: failedRate, dot: "bg-rose-400" },
-                      ].map((h, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground flex items-center gap-1.5">
-                            <span className={`h-1.5 w-1.5 rounded-full ${h.dot}`} />
-                            {h.label}
-                          </span>
-                          <span className="font-semibold text-foreground font-mono">{h.rate}%</span>
-                        </div>
-                      ))}
-                    </div>
+                {(fromDate || toDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFromDate("");
+                      setToDate("");
+                      setCurrentPage(1);
+                    }}
+                    className="text-[10px] text-muted-foreground hover:text-white underline cursor-pointer ml-1"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs">
+                <Filter className="h-3.5 w-3.5 text-gold/80" />
+                <select
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="bg-transparent text-foreground cursor-pointer outline-none font-medium"
+                >
+                  <option value="All" className="bg-[oklch(0.12_0.02_260)] text-foreground">All Events / Templates</option>
+                  {uniqueTypes.map((t) => (
+                    <option key={t} value={t} className="bg-[oklch(0.12_0.02_260)] text-foreground">{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto md:flex-1 justify-end">
+              <div className="relative flex-1 md:max-w-xs w-full">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search by guest name or mobile"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="luxury-input w-full pl-9 pr-4 py-2 rounded-xl text-xs"
+                />
+              </div>
+
+              <button
+                onClick={downloadCSV}
+                className="flex items-center gap-2 text-xs font-semibold gold-btn px-4 py-2 rounded-xl shadow-md shadow-gold/15 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
+              >
+                <Download className="h-4 w-4" />
+                Export
+              </button>
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
+            
+            <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
+              <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+                <div>
+                  <h3 className="font-display text-base font-semibold text-foreground">Communication Details</h3>
+                  {(fromDate || toDate) && (
+                    <p className="text-[11px] text-gold mt-0.5">
+                      Filtered: {fromDate || "Start"} to {toDate || "Present"} ({totalEntries} results)
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="p-16 text-center space-y-4">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-gold" />
+                  <p className="text-sm text-muted-foreground">Retrieving WhatsApp logs...</p>
+                </div>
+              ) : paginatedLogs.length === 0 ? (
+                <div className="p-16 text-center text-sm text-muted-foreground">
+                  No logs found matching selected filters.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-white/[0.02] border-b border-white/5 text-muted-foreground font-semibold uppercase tracking-wider">
+                        <th className="px-5 py-4">Guest Name</th>
+                        <th className="px-5 py-4">Mobile Number</th>
+                        <th className="px-5 py-4">Message Type</th>
+                        <th className="px-5 py-4">Status</th>
+                        <th className="px-5 py-4">Sent On</th>
+                        <th className="px-5 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {paginatedLogs.map((log) => {
+                        const initials = log.guestName.split(" ").map(w => w.charAt(0)).join("").slice(0, 2).toUpperCase();
+                        const colors = ["bg-indigo-500/10 text-indigo-400 border-indigo-500/20", "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", "bg-sky-500/10 text-sky-400 border-sky-500/20", "bg-rose-500/10 text-rose-400 border-rose-500/20", "bg-amber-500/10 text-amber-400 border-amber-500/20"];
+                        const colorIndex = log.guestName.charCodeAt(0) % colors.length;
+
+                        return (
+                          <tr key={log.id} className="hover:bg-white/[0.01] transition-colors">
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`h-8 w-8 rounded-full border flex items-center justify-center font-bold text-xs shrink-0 ${colors[colorIndex]}`}>
+                                  {initials}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="font-semibold text-foreground truncate">{log.guestName}</h4>
+                                  <p className="text-[10px] text-muted-foreground truncate">{log.guestEmail}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-1.5 font-mono text-muted-foreground">
+                                {log.mobileNumber}
+                                <a
+                                  href={`https://wa.me/${log.mobileNumber.replace(/\+/g, "")}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-1 rounded hover:bg-emerald-500/15 text-emerald-400 transition"
+                                  title="Open chat on WhatsApp Web"
+                                >
+                                  <Phone className="h-3 w-3" />
+                                </a>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className="bg-white/5 border border-white/10 rounded-full px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                {log.messageType}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              {log.status === "Read" ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-max">
+                                  <Check className="h-3 w-3" /> Read
+                                </span>
+                              ) : log.status === "Delivered" ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/20 flex items-center gap-1 w-max">
+                                  <Check className="h-3 w-3" /> Delivered
+                                </span>
+                              ) : log.status === "Failed" ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/20 flex items-center gap-1 w-max">
+                                  <AlertCircle className="h-3 w-3" /> Failed
+                                </span>
+                              ) : log.status === "Pending" ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20 flex items-center gap-1 w-max">
+                                  <Clock className="h-3 w-3" /> Pending
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/5 text-muted-foreground border border-white/10 flex items-center gap-1 w-max">
+                                  <Send className="h-3 w-3" /> Sent
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-4 text-muted-foreground whitespace-nowrap">
+                              {new Date(log.sentOn).toLocaleString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleResend(log)}
+                                  className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-gold transition"
+                                  title="Resend Notification"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setSelectedMessage(log)}
+                                  className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-gold transition"
+                                  title="View Message Body"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="px-5 py-4 border-t border-white/5 flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalEntries)} of {totalEntries} entries
+                </span>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <span>Rows per page:</span>
+                    <select
+                      value={rowsPerPage}
+                      onChange={(e) => {
+                        setRowsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="bg-white/5 border border-white/10 rounded-lg p-1 text-foreground cursor-pointer"
+                    >
+                      <option value={5} className="bg-[oklch(0.12_0.02_260)]">5</option>
+                      <option value={10} className="bg-[oklch(0.12_0.02_260)]">10</option>
+                      <option value={25} className="bg-[oklch(0.12_0.02_260)]">25</option>
+                    </select>
                   </div>
 
-                  {/* Quick Actions Panel */}
-                  <div className="glass-card rounded-2xl border border-white/5 p-5 space-y-3">
-                    <h3 className="font-display text-sm font-semibold text-foreground mb-1">Quick Actions</h3>
-                    
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={() => {
-                        const failed = logs.filter(l => l.status === "Failed");
-                        failed.forEach(handleResend);
-                      }}
-                      className="w-full text-left py-2.5 px-3 rounded-xl border border-white/5 bg-white/3 hover:bg-white/5 text-xs text-foreground flex items-center gap-2 transition"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="h-7 w-7 rounded-lg border border-white/5 flex items-center justify-center hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
                     >
-                      <RotateCcw className="h-4 w-4 text-gold shrink-0" />
-                      Resend Failed Messages
+                      <ChevronLeft className="h-4 w-4" />
                     </button>
-
+                    <span className="px-2 font-mono">
+                      {currentPage} / {totalPages}
+                    </span>
                     <button
-                      onClick={() => {
-                        setShowSendModal(true);
-                        setSendTemplate("booking_confirmed");
-                      }}
-                      className="w-full text-left py-2.5 px-3 rounded-xl border border-white/5 bg-white/3 hover:bg-white/5 text-xs text-foreground flex items-center gap-2 transition"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="h-7 w-7 rounded-lg border border-white/5 flex items-center justify-center hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
                     >
-                      <Send className="h-4 w-4 text-gold shrink-0" />
-                      Send Event Reminder
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setShowSendModal(true);
-                        setSendTemplate("payment_success");
-                      }}
-                      className="w-full text-left py-2.5 px-3 rounded-xl border border-white/5 bg-white/3 hover:bg-white/5 text-xs text-foreground flex items-center gap-2 transition"
-                    >
-                      <ExternalLink className="h-4 w-4 text-gold shrink-0" />
-                      Share Meeting Link
-                    </button>
-
-                    <button
-                      onClick={downloadCSV}
-                      className="w-full text-left py-2.5 px-3 rounded-xl border border-white/5 bg-white/3 hover:bg-white/5 text-xs text-foreground flex items-center gap-2 transition font-semibold"
-                    >
-                      <Download className="h-4 w-4 text-gold shrink-0" />
-                      Download Report
+                      <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
               </div>
-            </motion.div>
-          )}
+            </div>
 
-          {activeTab === "templates" && (
-            <motion.div
-              key="templates"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid gap-6 md:grid-cols-2"
-            >
-              {TEMPLATES.map((tpl) => (
-                <div key={tpl.id} className="glass-card rounded-2xl border border-white/5 p-5 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="bg-gold/10 border border-gold/20 text-gold text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full">
-                        {tpl.category}
+            <div className="space-y-6">
+              <div className="glass-card rounded-2xl border border-white/5 p-6 space-y-4">
+                <h3 className="font-display text-sm font-semibold text-foreground">Communication Health</h3>
+
+                <div className="flex justify-center relative py-4">
+                  <svg className="w-32 h-32 transform -rotate-90">
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="52"
+                      stroke="rgba(255,255,255,0.05)"
+                      strokeWidth="10"
+                      fill="transparent"
+                    />
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="52"
+                      stroke="var(--gold)"
+                      strokeWidth="10"
+                      fill="transparent"
+                      strokeDasharray={326.7}
+                      strokeDashoffset={326.7 - (326.7 * deliveryRate) / 100}
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold text-foreground">{deliveryRate}%</span>
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-semibold">Delivery Rate</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 border-t border-white/5 pt-4">
+                  {[
+                    { label: "Delivered", rate: deliveryRate, dot: "bg-emerald-400" },
+                    { label: "Read", rate: readRate, dot: "bg-sky-400" },
+                    { label: "Pending", rate: pendingRate, dot: "bg-amber-400" },
+                    { label: "Failed", rate: failedRate, dot: "bg-rose-400" },
+                  ].map((h, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <span className={`h-1.5 w-1.5 rounded-full ${h.dot}`} />
+                        {h.label}
                       </span>
-                      <span className="text-[10px] text-muted-foreground font-mono">ID: {tpl.id}</span>
+                      <span className="font-semibold text-foreground font-mono">{h.rate}%</span>
                     </div>
-                    <h3 className="font-display text-base font-semibold text-foreground">{tpl.name}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed bg-black/20 border border-white/5 rounded-xl p-3 font-mono italic">
-                      "{tpl.content}"
-                    </p>
-                  </div>
-
-                  <div className="flex justify-between items-center border-t border-white/5 pt-4">
-                    <p className="text-[10px] text-muted-foreground">Supported channels: WhatsApp API</p>
-                    <button
-                      onClick={() => {
-                        setSendTemplate(tpl.id);
-                        setShowSendModal(true);
-                      }}
-                      className="text-xs text-gold hover:underline flex items-center gap-1 font-semibold"
-                    >
-                      Use Template <ChevronRight className="h-3 w-3" />
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </motion.div>
-          )}
+              </div>
+            </div>
 
-          {activeTab === "history" && (
-            <motion.div
-              key="history"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-4"
-            >
-              {logs.slice(0, 15).map((log) => (
-                <div key={log.id} className="glass-card rounded-2xl border border-white/5 p-4 flex justify-between items-center gap-4 text-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
-                      <MessageSquare className="h-4 w-4 text-gold" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-foreground">{log.guestName} ({log.mobileNumber})</h4>
-                      <p className="text-muted-foreground mt-0.5 line-clamp-1">{log.content}</p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-muted-foreground">
-                      {log.messageType}
-                    </span>
-                    <p className="text-[10px] text-muted-foreground mt-1">{new Date(log.sentOn).toLocaleString()}</p>
-                  </div>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        </div>
       </main>
 
-      {/* ── Modal: Send Custom WhatsApp Notification ── */}
       <AnimatePresence>
         {showSendModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md px-4 py-6 overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="glass-card rounded-2xl p-6 w-full max-w-md border border-[var(--gold)]/20 shadow-2xl relative"
+              className="glass-card rounded-2xl p-6 w-full max-w-lg border border-[var(--gold)]/30 shadow-2xl shadow-black/80 relative"
             >
-              <h3 className="font-display text-xl font-bold text-foreground mb-1">
-                Send WhatsApp Notification
-              </h3>
-              <p className="text-xs text-muted-foreground mb-4">
-                Push direct templates or custom alerts directly to guests via WhatsApp.
-              </p>
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+                <div>
+                  <h3 className="font-display text-xl font-bold text-foreground">
+                    Send WhatsApp Notification
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Push official templates directly to guests via WhatsApp.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSendModal(false)}
+                  className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-white/5 transition cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
 
               {sendSuccess ? (
                 <div className="p-8 text-center space-y-3">
                   <div className="h-12 w-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
                     <Check className="h-6 w-6" />
                   </div>
-                  <h4 className="font-semibold text-foreground text-sm">Message Sent Successfully!</h4>
-                  <p className="text-xs text-muted-foreground">The notification logs have been updated.</p>
+                  <h4 className="font-semibold text-foreground text-sm">Message Dispatched Successfully!</h4>
+                  <p className="text-xs text-muted-foreground">The notification logs have been updated in real-time.</p>
                 </div>
               ) : (
                 <form onSubmit={handleSendSubmit} className="space-y-4">
-                  {/* Recipient Phone */}
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider block">
-                      Recipient Mobile Number
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="e.g. 919876543210 (include country code)"
-                      value={sendPhone}
-                      onChange={(e) => setSendPhone(e.target.value.replace(/[^\d+]/g, ""))}
-                      className="luxury-input w-full px-3 py-2.5 rounded-xl text-sm"
-                    />
+                  
+                  <div className="p-1 rounded-xl bg-black/40 border border-white/10 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchCustomerMode("existing")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        customerMode === "existing"
+                          ? "bg-[var(--gold)] text-black shadow-md font-bold"
+                          : "text-muted-foreground hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <Users className="h-4 w-4" /> Existing User
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchCustomerMode("new")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        customerMode === "new"
+                          ? "bg-[var(--gold)] text-black shadow-md font-bold"
+                          : "text-muted-foreground hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <UserPlus className="h-4 w-4" /> New User
+                    </button>
                   </div>
 
-                  {/* Template Select */}
+                  {customerMode === "existing" && (
+                    <div className="space-y-2 p-3.5 rounded-xl border border-[var(--gold)]/25 bg-[var(--gold)]/5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-gold uppercase tracking-wider flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5" /> Select Customer <span className="text-rose-400">*</span>
+                        </label>
+                      </div>
+
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowUserDropdown((prev) => !prev)}
+                          className={`luxury-input w-full rounded-lg px-3 py-2.5 text-xs flex items-center justify-between text-left cursor-pointer hover:border-[var(--gold)]/50 transition ${
+                            fieldErrors.customer ? "border-rose-500 bg-rose-500/10" : ""
+                          }`}
+                        >
+                          <span className={selectedUserId ? "text-foreground font-semibold" : "text-muted-foreground"}>
+                            {selectedUserId
+                              ? `${recipientName} (${sendPhone || "No Phone"})`
+                              : `-- Select Registered Customer --`}
+                          </span>
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
+                              showUserDropdown ? "rotate-180 text-gold" : ""
+                            }`}
+                          />
+                        </button>
+
+                        {fieldErrors.customer && (
+                          <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                            <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.customer}
+                          </p>
+                        )}
+
+                        {showUserDropdown && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setShowUserDropdown(false)}
+                            />
+                            <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border border-white/15 bg-[oklch(0.12_0.03_260)] backdrop-blur-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                              <div className="max-h-48 overflow-y-auto divide-y divide-white/5 py-1">
+                                {users.map((u) => {
+                                  const isSelected = String(selectedUserId) === String(u.id);
+                                  const uName = u.fullName || u.name || `User #${u.id}`;
+                                  return (
+                                    <button
+                                      key={u.id}
+                                      type="button"
+                                      onClick={() => {
+                                        handleSelectRegisteredUser(u);
+                                        setShowUserDropdown(false);
+                                      }}
+                                      className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between transition cursor-pointer ${
+                                        isSelected
+                                          ? "bg-[var(--gold)]/15 text-gold font-semibold"
+                                          : "text-foreground hover:bg-white/5 hover:text-gold"
+                                      }`}
+                                    >
+                                      <div>
+                                        <span className="font-semibold text-foreground">{uName}</span>
+                                        <span className="text-[10px] text-muted-foreground ml-2">({u.phone || u.email || "No phone"})</span>
+                                      </div>
+                                      {isSelected && <Check className="h-3.5 w-3.5 text-gold shrink-0" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {customerMode === "new" && (
+                    <div className="space-y-3 p-3.5 rounded-xl border border-white/10 bg-white/[0.02]">
+                      <div>
+                        <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider block">
+                          Recipient Full Name <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Rahul Sharma"
+                          value={recipientName}
+                          onChange={(e) => {
+                            setRecipientName(e.target.value);
+                            clearFieldError("name");
+                          }}
+                          className={`luxury-input w-full px-3 py-2.5 rounded-xl text-sm mt-1 ${
+                            fieldErrors.name ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                          }`}
+                        />
+                        {fieldErrors.name && (
+                          <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                            <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.name}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider block">
+                          Recipient Mobile Number <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="e.g. 919876543210"
+                          value={sendPhone}
+                          onChange={(e) => {
+                            setSendPhone(e.target.value.replace(/[^\d+]/g, ""));
+                            clearFieldError("phone");
+                          }}
+                          className={`luxury-input w-full px-3 py-2.5 rounded-xl text-sm mt-1 ${
+                            fieldErrors.phone ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                          }`}
+                        />
+                        {fieldErrors.phone && (
+                          <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                            <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.phone}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider block">
-                      Notification Template
+                      Notification Template <span className="text-rose-400">*</span>
                     </label>
                     <select
                       value={sendTemplate}
                       onChange={(e) => {
                         setSendTemplate(e.target.value);
-                        setCustomMessage(""); // Reset custom message if selected
+                        setCustomMessage("");
                       }}
                       className="luxury-input w-full px-3 py-2.5 rounded-xl text-sm bg-[oklch(0.12_0.02_260)] cursor-pointer"
                     >
-                      {TEMPLATES.map((t) => (
+                      {META_TEMPLATES.map((t) => (
                         <option key={t.id} value={t.id} className="bg-[oklch(0.12_0.02_260)]">
                           {t.name}
                         </option>
                       ))}
                       <option value="custom" className="bg-[oklch(0.12_0.02_260)]">
-                        -- Custom Message --
+                        -- Custom Direct Message --
                       </option>
                     </select>
                   </div>
 
-                  {/* Preview / Custom Text Body */}
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider block">
-                      Message Content Preview
-                    </label>
-                    {sendTemplate === "custom" ? (
+                  {sendTemplate === "custom" && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider block">
+                        Custom Message Content <span className="text-rose-400">*</span>
+                      </label>
                       <textarea
                         rows={4}
                         placeholder="Type your custom notification body..."
                         value={customMessage}
-                        onChange={(e) => setCustomMessage(e.target.value)}
-                        className="luxury-input w-full px-3 py-2 rounded-xl text-sm bg-[oklch(0.12_0.02_260)] resize-none"
+                        onChange={(e) => {
+                          setCustomMessage(e.target.value);
+                          clearFieldError("message");
+                        }}
+                        className={`luxury-input w-full px-3 py-2 rounded-xl text-sm bg-[oklch(0.12_0.02_260)] resize-none ${
+                          fieldErrors.message ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                        }`}
                       />
-                    ) : (
-                      <div className="bg-black/40 border border-white/5 rounded-xl p-3 text-xs font-mono text-muted-foreground leading-relaxed italic">
-                        {previewText}
-                      </div>
-                    )}
-                  </div>
+                      {fieldErrors.message && (
+                        <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                          <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {sendError && (
-                    <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-lg text-center">
-                      {sendError}
+                    <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2.5 rounded-lg text-center font-medium flex items-center justify-center gap-1.5">
+                      <AlertCircle className="h-4 w-4 shrink-0" /> {sendError}
                     </p>
                   )}
 
-                  {/* Actions */}
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
                       onClick={() => setShowSendModal(false)}
-                      className="flex-1 glass rounded-xl py-2.5 text-xs text-muted-foreground border border-white/10 hover:text-foreground transition-all"
+                      className="flex-1 glass rounded-xl py-2.5 text-xs text-muted-foreground border border-white/10 hover:text-foreground transition-all cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={sending}
-                      className="flex-1 gold-btn rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      className="flex-1 gold-btn rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-lg shadow-gold/15"
                     >
                       {sending ? (
                         <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending...
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Dispatching...
                         </>
                       ) : (
                         <>
-                          <Send className="h-3.5 w-3.5" /> Send Message
+                          <Send className="h-3.5 w-3.5" /> Send Template
                         </>
                       )}
                     </button>
@@ -953,7 +999,6 @@ export default function CommunicationPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Modal: View Selected Message Log ── */}
       <AnimatePresence>
         {selectedMessage && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
@@ -1003,13 +1048,13 @@ export default function CommunicationPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => handleResend(selectedMessage)}
-                  className="flex-1 gold-btn rounded-xl py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+                  className="flex-1 gold-btn rounded-xl py-2 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <RotateCcw className="h-3.5 w-3.5" /> Resend Message
                 </button>
                 <button
                   onClick={() => setSelectedMessage(null)}
-                  className="flex-1 glass rounded-xl py-2 text-xs text-muted-foreground border border-white/10 hover:text-foreground transition-all"
+                  className="flex-1 glass rounded-xl py-2 text-xs text-muted-foreground border border-white/10 hover:text-foreground transition-all cursor-pointer"
                 >
                   Close
                 </button>

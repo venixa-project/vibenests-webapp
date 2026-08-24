@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { Plus, Search, Pencil, Trash2, X, ImagePlus } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, ImagePlus, AlertCircle } from "lucide-react";
 import { addonsApi } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -52,11 +52,21 @@ export default function AddonsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [newCatInput, setNewCatInput] = useState("");
   const [allCategories, setAllCategories] = useState<string[]>(["Decoration", "Food & Beverage", "Entertainment", "Media"]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   const filtered = useMemo(() => {
     return addons.filter((a) => {
@@ -88,6 +98,7 @@ export default function AddonsPage() {
   function openAdd() {
     setEditId(null);
     setForm(emptyForm);
+    setFieldErrors({});
     setShowModal(true);
   }
 
@@ -101,23 +112,36 @@ export default function AddonsPage() {
       image: a.image || "",
       description: a.description,
     });
+    setFieldErrors({});
     setShowModal(true);
   }
 
   function parsePrice(input: string | number): number {
     if (typeof input === "number") return input;
-    const cleaned = input.replace(/[₹\s,]/g, "");
+    const cleaned = String(input).replace(/[₹\s,]/g, "");
     const n = Number(cleaned);
     return Number.isFinite(n) ? n : 0;
   }
 
   async function handleSave() {
-    if (!form.name.trim()) return;
+    const errors: Record<string, string> = {};
+    if (!form.name.trim()) {
+      errors.name = "Add-on name is required.";
+    }
+    const parsed = parsePrice(form.price);
+    if (!String(form.price).trim() || parsed <= 0) {
+      errors.price = "Please enter a valid price (e.g. 500).";
+    }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error("Please fill all required fields correctly.");
+      return;
+    }
 
     const payload = {
       ...form,
-      price: parsePrice(form.price),
-      // backend expects 'active' | 'inactive'
+      price: parsed,
       status: form.status,
     };
 
@@ -285,19 +309,31 @@ export default function AddonsPage() {
                 </div>
               </div>
               {[
-                { label: t("app.admin.addonName", "Add-on Name"), key: "name", placeholder: t("app.admin.addonNamePlaceholder", "e.g. Birthday Cake") },
-                { label: t("app.admin.priceLabel", "Price"), key: "price", placeholder: t("app.admin.pricePlaceholder", "e.g. ₹1,200") },
-                { label: t("app.admin.description", "Description"), key: "description", placeholder: t("app.admin.descriptionPlaceholder", "Brief description...") },
-              ].map(({ label, key, placeholder }) => (
+                { label: t("app.admin.addonName", "Add-on Name"), key: "name", required: true, placeholder: t("app.admin.addonNamePlaceholder", "e.g. Birthday Cake") },
+                { label: t("app.admin.priceLabel", "Price"), key: "price", required: true, placeholder: t("app.admin.pricePlaceholder", "e.g. ₹1,200") },
+                { label: t("app.admin.description", "Description"), key: "description", required: false, placeholder: t("app.admin.descriptionPlaceholder", "Brief description...") },
+              ].map(({ label, key, required, placeholder }) => (
                 <div key={key}>
-                  <label className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</label>
+                  <label className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    {label} {required && <span className="text-rose-400">*</span>}
+                  </label>
                   <input
                     type="text"
                     placeholder={placeholder}
                     value={String(form[key as keyof typeof form] ?? "")}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    className="luxury-input w-full rounded-lg px-3 py-2 text-sm mt-0.5"
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, [key]: e.target.value }));
+                      clearFieldError(key);
+                    }}
+                    className={`luxury-input w-full rounded-lg px-3 py-2 text-sm mt-0.5 ${
+                      fieldErrors[key] ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                    }`}
                   />
+                  {fieldErrors[key] && (
+                    <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors[key]}
+                    </p>
+                  )}
                 </div>
               ))}
 

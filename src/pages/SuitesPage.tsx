@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Search, Pencil, Trash2, X, BedDouble, ImagePlus, Check, ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, BedDouble, ImagePlus, Check, ChevronLeft, ChevronRight, Calendar, Clock, AlertCircle } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useSuitesContext, type Suite } from "@/components/admin/SuitesContext";
 import { suitesApi } from "@/lib/api";
@@ -371,8 +371,18 @@ export default function SuitesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
   const [availabilitySuite, setAvailabilitySuite] = useState<Suite | null>(null);
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   const filtered = suites.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase());
@@ -380,11 +390,67 @@ export default function SuitesPage() {
     return matchSearch && matchStatus;
   });
 
-  function openAdd() { setEditId(null); setForm(emptyForm); setShowModal(true); }
-  function openEdit(s: Suite) { setEditId(s.id); setForm({ name: s.name, minCapacity: s.minCapacity, capacity: s.capacity, price: s.price, ratePerExtraPerson: s.ratePerExtraPerson, baseDiscount: s.baseDiscount, slotStartTime: s.slotStartTime, slotEndTime: s.slotEndTime, slotDurationMins: s.slotDurationMins, gapBetweenSlotsMins: s.gapBetweenSlotsMins, occasions: s.occasions, status: s.status, description: s.description, images: s.images, amenities: s.amenities }); setShowModal(true); }
+  function openAdd() {
+    setEditId(null);
+    setForm(emptyForm);
+    setFieldErrors({});
+    setShowModal(true);
+  }
+
+  function openEdit(s: Suite) {
+    setEditId(s.id);
+    setForm({
+      name: s.name,
+      minCapacity: s.minCapacity,
+      capacity: s.capacity,
+      price: s.price,
+      ratePerExtraPerson: s.ratePerExtraPerson,
+      baseDiscount: s.baseDiscount,
+      slotStartTime: s.slotStartTime,
+      slotEndTime: s.slotEndTime,
+      slotDurationMins: s.slotDurationMins,
+      gapBetweenSlotsMins: s.gapBetweenSlotsMins,
+      occasions: s.occasions,
+      status: s.status,
+      description: s.description,
+      images: s.images,
+      amenities: s.amenities
+    });
+    setFieldErrors({});
+    setShowModal(true);
+  }
 
   async function handleSave() {
-    if (!form.name.trim()) return;
+    const errors: Record<string, string> = {};
+    if (!form.name.trim()) {
+      errors.name = "Suite name is required.";
+    }
+    const cleanPrice = String(form.price).replace(/[₹\s,]/g, "");
+    if (!cleanPrice || isNaN(Number(cleanPrice)) || Number(cleanPrice) <= 0) {
+      errors.price = "Please enter a valid price (e.g. 5000).";
+    }
+    if (form.minCapacity < 1) {
+      errors.minCapacity = "Min capacity must be at least 1.";
+    }
+    if (form.capacity < form.minCapacity) {
+      errors.capacity = `Max capacity must be at least ${form.minCapacity}.`;
+    }
+    if (!form.slotStartTime) {
+      errors.slotStartTime = "Start time is required.";
+    }
+    if (!form.slotEndTime) {
+      errors.slotEndTime = "End time is required.";
+    }
+    if (form.slotDurationMins < 30) {
+      errors.slotDurationMins = "Slot duration must be at least 30 mins.";
+    }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error("Please fill all required fields correctly.");
+      return;
+    }
+
     try {
       await saveSuite(form, editId);
       setShowModal(false);
@@ -528,22 +594,76 @@ export default function SuitesPage() {
                 </div>
               </div>
               {[
-                { label: t("app.admin.suiteName", "Suite Name"), key: "name", placeholder: t("app.admin.suiteNamePlaceholder", "e.g. Royal Celebration Suite") },
-                { label: t("app.admin.priceLabel", "Price"), key: "price", placeholder: t("app.admin.pricePlaceholder", "e.g. ₹8,500") },
-                { label: t("app.admin.occasionsLabel", "Occasions"), key: "occasions", placeholder: t("app.admin.occasionsPlaceholder", "e.g. Birthday, Anniversary") },
-              ].map(({ label, key, placeholder }) => (
+                { label: t("app.admin.suiteName", "Suite Name"), key: "name", required: true, placeholder: t("app.admin.suiteNamePlaceholder", "e.g. Royal Celebration Suite") },
+                { label: t("app.admin.priceLabel", "Price"), key: "price", required: true, placeholder: t("app.admin.pricePlaceholder", "e.g. ₹8,500") },
+                { label: t("app.admin.occasionsLabel", "Occasions"), key: "occasions", required: false, placeholder: t("app.admin.occasionsPlaceholder", "e.g. Birthday, Anniversary") },
+              ].map(({ label, key, required, placeholder }) => (
                 <div key={key}>
-                  <label className="text-xs text-muted-foreground uppercase tracking-wide">{label}</label>
-                  <input type="text" placeholder={placeholder} value={form[key as keyof typeof form] as string} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+                  <label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    {label} {required && <span className="text-rose-400">*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={placeholder}
+                    value={form[key as keyof typeof form] as string}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, [key]: e.target.value }));
+                      clearFieldError(key);
+                    }}
+                    className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${
+                      fieldErrors[key] ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                    }`}
+                  />
+                  {fieldErrors[key] && (
+                    <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors[key]}
+                    </p>
+                  )}
                 </div>
               ))}
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.minCapacityLabel", "Min Capacity (guests)")}</label>
-                <input type="number" min={1} value={form.minCapacity} onChange={(e) => setForm((f) => ({ ...f, minCapacity: Number(e.target.value) }))} className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+                <label className="text-xs text-muted-foreground uppercase tracking-wide">
+                  {t("app.admin.minCapacityLabel", "Min Capacity (guests)")} <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.minCapacity}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, minCapacity: Number(e.target.value) }));
+                    clearFieldError("minCapacity");
+                  }}
+                  className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${
+                    fieldErrors.minCapacity ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                  }`}
+                />
+                {fieldErrors.minCapacity && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.minCapacity}
+                  </p>
+                )}
               </div>
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.maxCapacityLabel", "Max Capacity (guests)")}</label>
-                <input type="number" min={form.minCapacity} value={form.capacity} onChange={(e) => setForm((f) => ({ ...f, capacity: Number(e.target.value) }))} className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+                <label className="text-xs text-muted-foreground uppercase tracking-wide">
+                  {t("app.admin.maxCapacityLabel", "Max Capacity (guests)")} <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={form.minCapacity}
+                  value={form.capacity}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, capacity: Number(e.target.value) }));
+                    clearFieldError("capacity");
+                  }}
+                  className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${
+                    fieldErrors.capacity ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                  }`}
+                />
+                {fieldErrors.capacity && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.capacity}
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -564,16 +684,71 @@ export default function SuitesPage() {
                 <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.timeSlotSettings", "Time Slot Settings")}</label>
                 <div className="mt-1.5 grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[10px] text-muted-foreground">{t("app.admin.startTime", "Start Time")}</label>
-                    <input type="time" value={form.slotStartTime} onChange={(e) => setForm((f) => ({ ...f, slotStartTime: e.target.value }))} className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" style={{ colorScheme: "dark" }} />
+                    <label className="text-[10px] text-muted-foreground">
+                      {t("app.admin.startTime", "Start Time")} <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={form.slotStartTime}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, slotStartTime: e.target.value }));
+                        clearFieldError("slotStartTime");
+                      }}
+                      className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${
+                        fieldErrors.slotStartTime ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                      }`}
+                      style={{ colorScheme: "dark" }}
+                    />
+                    {fieldErrors.slotStartTime && (
+                      <p className="mt-1 text-[10px] text-rose-400 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-2.5 w-2.5 shrink-0" /> {fieldErrors.slotStartTime}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="text-[10px] text-muted-foreground">{t("app.admin.endTime", "End Time")}</label>
-                    <input type="time" value={form.slotEndTime} onChange={(e) => setForm((f) => ({ ...f, slotEndTime: e.target.value }))} className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" style={{ colorScheme: "dark" }} />
+                    <label className="text-[10px] text-muted-foreground">
+                      {t("app.admin.endTime", "End Time")} <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={form.slotEndTime}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, slotEndTime: e.target.value }));
+                        clearFieldError("slotEndTime");
+                      }}
+                      className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${
+                        fieldErrors.slotEndTime ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                      }`}
+                      style={{ colorScheme: "dark" }}
+                    />
+                    {fieldErrors.slotEndTime && (
+                      <p className="mt-1 text-[10px] text-rose-400 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-2.5 w-2.5 shrink-0" /> {fieldErrors.slotEndTime}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="text-[10px] text-muted-foreground">{t("app.admin.slotDurationMins", "Slot Duration (minutes)")}</label>
-                    <input type="number" min={30} step={15} value={form.slotDurationMins} onChange={(e) => setForm((f) => ({ ...f, slotDurationMins: Number(e.target.value) }))} className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+                    <label className="text-[10px] text-muted-foreground">
+                      {t("app.admin.slotDurationMins", "Slot Duration (minutes)")} <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={30}
+                      step={15}
+                      value={form.slotDurationMins}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, slotDurationMins: Number(e.target.value) }));
+                        clearFieldError("slotDurationMins");
+                      }}
+                      className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${
+                        fieldErrors.slotDurationMins ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                      }`}
+                    />
+                    {fieldErrors.slotDurationMins && (
+                      <p className="mt-1 text-[10px] text-rose-400 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-2.5 w-2.5 shrink-0" /> {fieldErrors.slotDurationMins}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-[10px] text-muted-foreground">{t("app.admin.gapBetweenSlotsMins", "Gap Between Slots (minutes)")}</label>

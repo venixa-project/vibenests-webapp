@@ -1,18 +1,36 @@
 import { useState, useEffect, useRef } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { Save, Building2, Upload, Trash2 } from "lucide-react";
+import { Save, Building2, Upload, Trash2, AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { globalSettingsApi, usersApi } from "@/lib/api";
 import { useAuth } from "@/components/auth/AuthContext";
 import { updateGlobalLogo } from "@/components/shared/CompanyLogo";
 import { toast } from "sonner";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="flex flex-col gap-1.5"><label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{label}</label>{children}</div>;
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
+      {children}
+      {error && (
+        <p className="mt-0.5 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+          <AlertCircle className="h-3 w-3 shrink-0" /> {error}
+        </p>
+      )}
+    </div>
+  );
 }
 
-function Input({ value, onChange, type = "text", placeholder = "" }: { value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
-  return <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="luxury-input rounded-xl px-4 py-2.5 text-sm w-full" />;
+function Input({ value, onChange, type = "text", placeholder = "", hasError = false }: { value: string; onChange: (v: string) => void; type?: string; placeholder?: string; hasError?: boolean }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`luxury-input rounded-xl px-4 py-2.5 text-sm w-full ${hasError ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""}`}
+    />
+  );
 }
 
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
@@ -52,6 +70,16 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState("INR (₹)");
   const [timezone, setTimezone] = useState("Asia/Kolkata (IST)");
   const [language, setLanguage] = useState("English");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   useEffect(() => {
     // Fetch real authenticated user profile
@@ -90,6 +118,30 @@ export default function SettingsPage() {
   }
 
   async function handleSave() {
+    const errors: Record<string, string> = {};
+    if (!fullName.trim()) {
+      errors.fullName = "Admin full name is required.";
+    }
+    if (!businessName.trim()) {
+      errors.businessName = "Business name is required.";
+    }
+    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
+      errors.email = "Please enter a valid email address.";
+    }
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (!phone.trim() || cleanPhone.length < 10) {
+      errors.phone = "Please enter a valid 10-digit phone number.";
+    }
+    if (!address.trim()) {
+      errors.address = "Business address is required.";
+    }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error("Please fix highlighted fields.");
+      return;
+    }
+
     try {
       // 1. Update real user profile on backend
       const updatedUser = await usersApi.updateMe({ fullName, email, phone });
@@ -179,17 +231,50 @@ export default function SettingsPage() {
 
             {/* Form Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Admin Name">
-                <Input value={fullName} onChange={setFullName} placeholder="Admin Full Name" />
+              <Field label="Admin Name *" error={fieldErrors.fullName}>
+                <Input
+                  value={fullName}
+                  onChange={(v) => {
+                    setFullName(v);
+                    clearFieldError("fullName");
+                  }}
+                  hasError={!!fieldErrors.fullName}
+                  placeholder="Admin Full Name"
+                />
               </Field>
-              <Field label={t("app.admin.businessName", "Business Name")}>
-                <Input value={businessName} onChange={setBusinessName} placeholder="Your business name" />
+              <Field label={`${t("app.admin.businessName", "Business Name")} *`} error={fieldErrors.businessName}>
+                <Input
+                  value={businessName}
+                  onChange={(v) => {
+                    setBusinessName(v);
+                    clearFieldError("businessName");
+                  }}
+                  hasError={!!fieldErrors.businessName}
+                  placeholder="Your business name"
+                />
               </Field>
-              <Field label={t("app.admin.contactEmail", "Contact Email")}>
-                <Input value={email} onChange={setEmail} type="email" placeholder="admin@example.com" />
+              <Field label={`${t("app.admin.contactEmail", "Contact Email")} *`} error={fieldErrors.email}>
+                <Input
+                  value={email}
+                  onChange={(v) => {
+                    setEmail(v);
+                    clearFieldError("email");
+                  }}
+                  type="email"
+                  hasError={!!fieldErrors.email}
+                  placeholder="admin@example.com"
+                />
               </Field>
-              <Field label={t("app.admin.phoneNumber", "Phone Number")}>
-                <Input value={phone} onChange={setPhone} placeholder="+91 XXXXX XXXXX" />
+              <Field label={`${t("app.admin.phoneNumber", "Phone Number")} *`} error={fieldErrors.phone}>
+                <Input
+                  value={phone}
+                  onChange={(v) => {
+                    setPhone(v);
+                    clearFieldError("phone");
+                  }}
+                  hasError={!!fieldErrors.phone}
+                  placeholder="+91 XXXXX XXXXX"
+                />
               </Field>
               <Field label={t("app.admin.currency", "Currency")}>
                 <Select value={currency} onChange={setCurrency} options={["INR (₹)", "USD ($)", "EUR (€)", "GBP (£)"]} />
@@ -202,12 +287,17 @@ export default function SettingsPage() {
               </Field>
             </div>
 
-            <Field label={t("app.admin.businessAddress", "Business Address")}>
+            <Field label={`${t("app.admin.businessAddress", "Business Address")} *`} error={fieldErrors.address}>
               <textarea
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  clearFieldError("address");
+                }}
                 rows={3}
-                className="luxury-input rounded-xl px-4 py-3 text-sm w-full resize-none"
+                className={`luxury-input rounded-xl px-4 py-3 text-sm w-full resize-none ${
+                  fieldErrors.address ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                }`}
                 placeholder="Enter complete business address..."
               />
             </Field>

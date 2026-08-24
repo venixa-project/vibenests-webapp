@@ -4,7 +4,7 @@ import {
   CalendarDays, ChevronLeft, ChevronRight, Clock, CreditCard,
   Gift, MessageSquare, Star, Sparkles, Users, User, Plus, Minus,
   LayoutDashboard, BedDouble, History, Wallet, Tag, UserCircle,
-  HelpCircle, LogOut, Package, Bell, ChevronDown, Award,
+  HelpCircle, LogOut, Package, Bell, ChevronDown, Award, AlertCircle,
 } from "lucide-react";
 import { useSuitesContext, type Suite } from "@/components/admin/SuitesContext";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -847,8 +847,11 @@ export default function SuiteBookingPage() {
                           const Icon = o.icon;
                           const active = o.id === selectedOccasion;
                           return (
-                            <button key={o.id} type="button" onClick={() => setSelectedOccasion(o.id)}
-                              className={`flex flex-col gap-3 rounded-2xl border p-4 text-left transition-all ${active ? "border-gold bg-gold/10 shadow-[0_16px_40px_rgba(255,190,90,0.1)]"
+                            <button key={o.id} type="button" onClick={() => {
+                              setSelectedOccasion(o.id);
+                              setShowValidation(false);
+                            }}
+                              className={`flex flex-col gap-3 rounded-2xl border p-4 text-left transition-all cursor-pointer ${active ? "border-gold bg-gold/10 shadow-[0_16px_40px_rgba(255,190,90,0.1)]"
                                 : "border-white/10 bg-white/5 hover:border-gold/20 hover:bg-white/10"
                                 }`}>
                               <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${o.highlight}`}>
@@ -863,21 +866,34 @@ export default function SuiteBookingPage() {
                         })}
                       </div>
 
+                      {showValidation && !selectedOccasion && (
+                        <p className="text-xs text-rose-400 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in duration-200">
+                          <AlertCircle className="h-4 w-4 shrink-0" /> Please select an occasion for your celebration.
+                        </p>
+                      )}
+
                       {selectedOccasion === "other" && (
                         <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
                           <label className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold block">
-                            Specify Celebration / Occasion
+                            Specify Celebration / Occasion <span className="text-rose-400">*</span>
                           </label>
                           <input
                             type="text"
                             required
                             value={customOccasion}
-                            onChange={(e) => setCustomOccasion(e.target.value)}
+                            onChange={(e) => {
+                              setCustomOccasion(e.target.value);
+                              if (e.target.value.trim()) setShowValidation(false);
+                            }}
                             placeholder="e.g. Graduation Party, Farewell, Custom Celebration..."
-                            className="luxury-input w-full rounded-2xl px-4 py-3 text-sm bg-black/40"
+                            className={`luxury-input w-full rounded-2xl px-4 py-3 text-sm bg-black/40 ${
+                              showValidation && !customOccasion.trim() ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                            }`}
                           />
                           {showValidation && !customOccasion.trim() && (
-                            <p className="text-xs text-rose-400 mt-1 font-medium">Please specify the occasion to proceed.</p>
+                            <p className="text-xs text-rose-400 mt-1 font-medium flex items-center gap-1.5">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Please specify your custom celebration occasion to proceed.
+                            </p>
                           )}
                         </div>
                       )}
@@ -889,24 +905,39 @@ export default function SuiteBookingPage() {
                     <div className="space-y-6">
                       {/* Date */}
                       <div className="space-y-2">
-                        <label className="text-xs uppercase tracking-[0.25em] text-muted-foreground">{t("app.userDashboard.selectDate", "Select Date")}</label>
+                        <label className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                          {t("app.userDashboard.selectDate", "Select Date")} <span className="text-rose-400">*</span>
+                        </label>
                         <input
                           type="date"
                           value={bookingDate}
                           min={new Date().toISOString().split('T')[0]}
-                          onChange={(e) => setBookingDate(e.target.value)}
-                          className="luxury-input w-full rounded-2xl px-4 py-3 text-sm bg-black/40"
+                          onChange={(e) => {
+                            setBookingDate(e.target.value);
+                            setShowValidation(false);
+                          }}
+                          className={`luxury-input w-full rounded-2xl px-4 py-3 text-sm bg-black/40 ${
+                            showValidation && !bookingDate ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                          }`}
                           style={{ colorScheme: "dark" }}
                         />
+                        {showValidation && !bookingDate && (
+                          <p className="text-xs text-rose-400 mt-1 font-medium flex items-center gap-1.5">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Please select a booking date.
+                          </p>
+                        )}
                       </div>
 
                       {/* Time slot boxes */}
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">{t("app.userDashboard.selectTimeSlot", "Select Time Slot")}</p>
-                          {/* <span className="px-2 py-0.5 rounded-full bg-gold/10 border border-gold/25 text-[10px] text-gold font-semibold">{slotDuration} min per slot · {slotGap} min gap</span> */}
+                          <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                            {t("app.userDashboard.selectTimeSlot", "Select Time Slot")} <span className="text-rose-400">*</span>
+                          </p>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-1 rounded-2xl ${
+                          showValidation && startTimes.length === 0 ? "border border-rose-500/50 bg-rose-500/5" : ""
+                        }`}>
                           {timeSlots.length === 0 ? (
                             <div className="col-span-2 py-8 text-center text-xs text-muted-foreground border border-dashed border-white/10 rounded-2xl">
                               No slots defined for this suite.
@@ -924,13 +955,14 @@ export default function SuiteBookingPage() {
                                   type="button"
                                   disabled={isBlocked}
                                   onClick={() => {
+                                    setShowValidation(false);
                                     if (active) {
                                       setStartTimes(prev => prev.filter(s => s !== slot));
                                     } else {
                                       setStartTimes(prev => [...prev, slot]);
                                     }
                                   }}
-                                  className={`flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border text-sm font-medium transition-all ${isBlocked
+                                  className={`flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border text-sm font-medium transition-all cursor-pointer ${isBlocked
                                     ? "border-white/5 bg-white/[0.01] text-muted-foreground/45 opacity-45 cursor-not-allowed"
                                     : active
                                       ? "border-gold bg-gold/15 text-gold shadow-[0_0_16px_rgba(212,160,60,0.2)]"
@@ -954,6 +986,11 @@ export default function SuiteBookingPage() {
                             })
                           )}
                         </div>
+                        {showValidation && startTimes.length === 0 && (
+                          <p className="text-xs text-rose-400 mt-1 font-medium flex items-center gap-1.5">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Please select at least one available time slot to continue.
+                          </p>
+                        )}
                       </div>
 
                       {/* Selected slot badge */}

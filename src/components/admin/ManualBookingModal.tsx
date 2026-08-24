@@ -63,6 +63,16 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   // Data lists
   const [suites, setSuites] = useState<ApiSuite[]>([]);
@@ -98,6 +108,7 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
   const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
   const [couponDiscount, setCouponDiscount] = useState<number>(0);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
 
   // Payment details
   const [paymentMode, setPaymentMode] = useState<"cash" | "upi" | "card" | "bank_transfer">("cash");
@@ -118,6 +129,13 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
     addonsApi.getAll().then((list) => {
       setAddons(list as ApiAddon[]);
     }).catch(() => { });
+
+    // Fetch active coupons
+    couponsApi.getActive()
+      .then((list) => setAvailableCoupons(Array.isArray(list) ? list : []))
+      .catch(() => {
+        couponsApi.getAll().then((list) => setAvailableCoupons(Array.isArray(list) ? list : [])).catch(() => setAvailableCoupons([]));
+      });
   }, []);
 
   // Fetch blocked slots when suite or date changes
@@ -141,6 +159,10 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
     setLastName(parts.slice(1).join(" ") || "");
     setPhone(u.phone || "");
     setEmail(u.email || "");
+    clearFieldError("customer");
+    clearFieldError("firstName");
+    clearFieldError("phone");
+    clearFieldError("email");
     setShowUserDropdown(false);
     setUserSearch("");
     toast.success(`Autofilled details for: ${rawName}`);
@@ -158,6 +180,7 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
 
   function handleSwitchCustomerMode(mode: "existing" | "new") {
     setCustomerMode(mode);
+    clearFieldError("customer");
     if (mode === "new") {
       handleClearUser();
     }
@@ -180,6 +203,7 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
     const duration = selectedSuite.slotDurationMins ?? 150;
     setStartTime(slot);
     setEndTime(computeEndTime(slot, duration));
+    clearFieldError("timeSlot");
   }
 
   // Addon helpers
@@ -219,20 +243,22 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
   const balanceDue = Math.max(0, totalAmount - advanceAmount);
 
   // Coupon handling
-  async function handleApplyCoupon() {
-    if (!couponCode.trim()) return;
+  async function handleApplyCoupon(codeToApply?: string) {
+    const code = (typeof codeToApply === "string" ? codeToApply : couponCode).trim().toUpperCase();
+    if (!code) return;
     setCouponLoading(true);
     try {
       const res = await couponsApi.validate({
-        code: couponCode.trim().toUpperCase(),
+        code,
         bookingAmount: subtotal,
       });
       if (res?.valid) {
-        setAppliedCoupon(res.coupon || { code: couponCode.trim().toUpperCase() });
+        setAppliedCoupon(res.coupon || { code });
         setCouponDiscount(Number(res.discountAmount || 0));
-        toast.success(`Coupon "${couponCode.trim().toUpperCase()}" applied! (Saved ₹${res.discountAmount})`);
+        setCouponCode(code);
+        toast.success(`Coupon "${code}" applied! (Saved ₹${res.discountAmount})`);
       } else {
-        toast.error(res?.message || "Invalid coupon code");
+        toast.error(res?.message || "Invalid coupon code for this booking amount");
       }
     } catch (e: any) {
       toast.error(e?.message || "Failed to validate coupon");
@@ -245,47 +271,65 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
     setAppliedCoupon(null);
     setCouponDiscount(0);
     setCouponCode("");
+    toast.info("Coupon removed");
   }
 
   // Form Validation
-  function validateStep(s: number): string {
+  function validateStep(s: number): boolean {
+    const errors: Record<string, string> = {};
     if (s === 0) {
-      if (!firstName.trim()) return "First name is required.";
-      if (!phone.trim() || phone.trim().length < 6) return "A valid contact phone number is required.";
+      if (customerMode === "existing" && !selectedUserId) {
+        errors.customer = "Please select a registered customer or switch to New User.";
+      }
+      if (!firstName.trim()) {
+        errors.firstName = "First name is required.";
+      }
+      const cleanPhone = phone.replace(/\D/g, "");
+      if (!cleanPhone) {
+        errors.phone = "Phone number is required.";
+      } else if (cleanPhone.length < 10) {
+        errors.phone = "Please enter a valid 10-digit phone number.";
+      }
       if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-        return "Please enter a valid email address.";
+        errors.email = "Please enter a valid email address.";
       }
       if (occasion === "Other" && !customOccasion.trim()) {
-        return "Please specify the occasion.";
+        errors.customOccasion = "Please specify the custom occasion.";
       }
     } else if (s === 1) {
-      if (!selectedSuite) return "Please select a luxury suite.";
-      if (!date) return "Please select a booking date.";
-      if (!startTime || !endTime) return "Please select an available time slot.";
+      if (!date) {
+        errors.date = "Please select a booking date.";
+      }
+      if (!selectedSuite) {
+        errors.suite = "Please select a luxury suite.";
+      }
+      if (!startTime || !endTime) {
+        errors.timeSlot = "Please select an available time slot.";
+      }
     } else if (s === 3) {
       if (collectionType === "partial" && advanceAmount <= 0) {
-        return "Please specify the partial advance amount collected.";
+        errors.advanceAmount = "Please specify the partial advance amount collected (> ₹0).";
       }
     }
-    return "";
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError("Please fix the highlighted fields below to continue.");
+      return false;
+    }
+    setError("");
+    return true;
   }
 
   function handleNext() {
-    const err = validateStep(step);
-    if (err) {
-      setError(err);
-      return;
-    }
+    if (!validateStep(step)) return;
+    setFieldErrors({});
     setError("");
     setStep((prev) => Math.min(stepLabels.length - 1, prev + 1));
   }
 
   async function handleSubmit() {
-    const err = validateStep(3);
-    if (err) {
-      setError(err);
-      return;
-    }
+    if (!validateStep(3)) return;
 
     setLoading(true);
     setError("");
@@ -474,7 +518,8 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                     <button
                       type="button"
                       onClick={() => setShowUserDropdown((prev) => !prev)}
-                      className="luxury-input w-full rounded-lg px-3 py-2 text-xs flex items-center justify-between text-left cursor-pointer hover:border-[var(--gold)]/50 transition"
+                      className={`luxury-input w-full rounded-lg px-3 py-2 text-xs flex items-center justify-between text-left cursor-pointer hover:border-[var(--gold)]/50 transition ${fieldErrors.customer ? "border-rose-500 bg-rose-500/10" : ""
+                        }`}
                     >
                       <span className={selectedUserId ? "text-foreground font-semibold" : "text-muted-foreground"}>
                         {selectedUserId
@@ -486,6 +531,12 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                           }`}
                       />
                     </button>
+
+                    {fieldErrors.customer && (
+                      <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.customer}
+                      </p>
+                    )}
 
                     {showUserDropdown && (
                       <>
@@ -510,7 +561,10 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                                     : "text-foreground hover:bg-white/5 hover:text-gold"
                                     }`}
                                 >
-                                  <span>{u.name || `User #${u.id}`}</span>
+                                  <div>
+                                    <span className="font-semibold text-foreground">{u.name || `User #${u.id}`}</span>
+                                    <span className="text-[10px] text-muted-foreground ml-2">({u.phone || u.email || "No details"})</span>
+                                  </div>
                                   {isSelected && <Check className="h-3.5 w-3.5 text-gold shrink-0" />}
                                 </button>
                               );
@@ -531,16 +585,25 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
               {/* Guest Details Form (Autofilled or Manual Entry) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                    First Name <span className="text-rose-400">*</span>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium flex items-center justify-between">
+                    <span>First Name <span className="text-rose-400">*</span></span>
                   </label>
                   <input
                     type="text"
                     placeholder="e.g. Rajesh"
                     value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1"
+                    onChange={(e) => {
+                      setFirstName(e.target.value);
+                      clearFieldError("firstName");
+                    }}
+                    className={`luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1 ${fieldErrors.firstName ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                      }`}
                   />
+                  {fieldErrors.firstName && (
+                    <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.firstName}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -557,16 +620,25 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                    Phone Number <span className="text-rose-400">*</span>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium flex items-center justify-between">
+                    <span>Phone Number <span className="text-rose-400">*</span></span>
                   </label>
                   <input
                     type="tel"
                     placeholder="e.g. 9876543210"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1"
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      clearFieldError("phone");
+                    }}
+                    className={`luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1 ${fieldErrors.phone ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                      }`}
                   />
+                  {fieldErrors.phone && (
+                    <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.phone}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -577,9 +649,18 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                     type="email"
                     placeholder="e.g. rajesh@gmail.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1"
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      clearFieldError("email");
+                    }}
+                    className={`luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1 ${fieldErrors.email ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                      }`}
                   />
+                  {fieldErrors.email && (
+                    <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -637,9 +718,18 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                     type="text"
                     placeholder="e.g. Private Movie Screening, Milestone Promotion..."
                     value={customOccasion}
-                    onChange={(e) => setCustomOccasion(e.target.value)}
-                    className="luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1"
+                    onChange={(e) => {
+                      setCustomOccasion(e.target.value);
+                      clearFieldError("customOccasion");
+                    }}
+                    className={`luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1 ${fieldErrors.customOccasion ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                      }`}
                   />
+                  {fieldErrors.customOccasion && (
+                    <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.customOccasion}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -666,30 +756,40 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
 
               {/* Date Selection */}
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                  Booking Date <span className="text-rose-400">*</span>
+                <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium flex items-center justify-between">
+                  <span>Booking Date <span className="text-rose-400">*</span></span>
                 </label>
                 <input
                   type="date"
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    clearFieldError("date");
+                  }}
                   min={new Date().toISOString().split("T")[0]}
-                  className="luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1"
+                  className={`luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1 ${fieldErrors.date ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                    }`}
                   style={{ colorScheme: "dark" }}
                 />
+                {fieldErrors.date && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.date}
+                  </p>
+                )}
               </div>
 
               {/* Suite Selection Dropdown */}
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                  Select Luxury Suite <span className="text-rose-400">*</span>
+                <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium flex items-center justify-between">
+                  <span>Select Luxury Suite <span className="text-rose-400">*</span></span>
                 </label>
 
                 <div className="relative mt-1">
                   <button
                     type="button"
                     onClick={() => setShowSuiteDropdown((prev) => !prev)}
-                    className="luxury-input w-full rounded-lg px-3 py-2 text-xs flex items-center justify-between text-left cursor-pointer hover:border-[var(--gold)]/50 transition"
+                    className={`luxury-input w-full rounded-lg px-3 py-2 text-xs flex items-center justify-between text-left cursor-pointer hover:border-[var(--gold)]/50 transition ${fieldErrors.suite ? "border-rose-500 bg-rose-500/5" : ""
+                      }`}
                   >
                     <span className={selectedSuite ? "text-foreground font-semibold" : "text-muted-foreground"}>
                       {selectedSuite
@@ -701,6 +801,12 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                         }`}
                     />
                   </button>
+
+                  {fieldErrors.suite && (
+                    <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.suite}
+                    </p>
+                  )}
 
                   {showSuiteDropdown && (
                     <>
@@ -720,6 +826,7 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                                   setSelectedSuite(s);
                                   setStartTime("");
                                   setEndTime("");
+                                  clearFieldError("suite");
                                   setShowSuiteDropdown(false);
                                 }}
                                 className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition cursor-pointer ${isSelected
@@ -778,38 +885,46 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                     }
 
                     return (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
-                        {slots.map((slot) => {
-                          const isBlocked = blockedSlots.includes(slot);
-                          const isSelected = startTime === slot;
-                          const calculatedEnd = computeEndTime(slot, selectedSuite.slotDurationMins ?? 150);
+                      <div>
+                        <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1 p-1 rounded-xl ${fieldErrors.timeSlot ? "border border-rose-500/60 bg-rose-500/5" : ""
+                          }`}>
+                          {slots.map((slot) => {
+                            const isBlocked = blockedSlots.includes(slot);
+                            const isSelected = startTime === slot;
+                            const calculatedEnd = computeEndTime(slot, selectedSuite.slotDurationMins ?? 150);
 
-                          return (
-                            <button
-                              key={slot}
-                              type="button"
-                              disabled={isBlocked}
-                              onClick={() => handleSelectSlot(slot)}
-                              className={`p-2.5 rounded-xl border text-left transition relative flex flex-col justify-center cursor-pointer ${isSelected
-                                ? "border-[var(--gold)] bg-[var(--gold)]/20 text-gold shadow-md"
-                                : isBlocked
-                                  ? "border-white/5 bg-white/[0.01] opacity-35 cursor-not-allowed line-through text-muted-foreground"
-                                  : "border-white/10 hover:border-gold/50 bg-white/[0.03] text-foreground"
-                                }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold">{slot}</span>
-                                {isSelected && <Check className="h-3 w-3 text-gold" />}
-                              </div>
-                              <span className="text-[10px] text-muted-foreground mt-0.5">
-                                to {calculatedEnd}
-                              </span>
-                              {isBlocked && (
-                                <span className="text-[9px] text-rose-400 font-medium">Booked / Blocked</span>
-                              )}
-                            </button>
-                          );
-                        })}
+                            return (
+                              <button
+                                key={slot}
+                                type="button"
+                                disabled={isBlocked}
+                                onClick={() => handleSelectSlot(slot)}
+                                className={`p-2.5 rounded-xl border text-left transition relative flex flex-col justify-center cursor-pointer ${isSelected
+                                  ? "border-[var(--gold)] bg-[var(--gold)]/20 text-gold shadow-md"
+                                  : isBlocked
+                                    ? "border-white/5 bg-white/[0.01] opacity-35 cursor-not-allowed line-through text-muted-foreground"
+                                    : "border-white/10 hover:border-gold/50 bg-white/[0.03] text-foreground"
+                                  }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold">{slot}</span>
+                                  {isSelected && <Check className="h-3.5 w-3.5 text-gold" />}
+                                </div>
+                                <span className="text-[10px] text-muted-foreground mt-0.5">
+                                  to {calculatedEnd}
+                                </span>
+                                {isBlocked && (
+                                  <span className="text-[9px] text-rose-400 font-medium">Booked / Blocked</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {fieldErrors.timeSlot && (
+                          <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                            <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.timeSlot}
+                          </p>
+                        )}
                       </div>
                     );
                   })()}
@@ -923,30 +1038,89 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                   </div>
                 )}
 
-                {/* Coupon Code input */}
-                <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
+                {/* Coupon Code input & Available Coupons */}
+                <div className="pt-2 border-t border-white/5 space-y-2">
                   {!appliedCoupon ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <input
-                        type="text"
-                        placeholder="Coupon code (Optional)"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        className="luxury-input flex-1 rounded-lg px-2.5 py-1 text-xs"
-                      />
-                      <button
-                        type="button"
-                        disabled={couponLoading || !couponCode.trim()}
-                        onClick={handleApplyCoupon}
-                        className="gold-btn px-3 py-1 rounded-lg text-xs font-semibold disabled:opacity-50 cursor-pointer"
-                      >
-                        {couponLoading ? "Applying..." : "Apply"}
-                      </button>
-                    </div>
+                    <>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Coupon code (e.g. VIP20)"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          className="luxury-input flex-1 rounded-lg px-2.5 py-1.5 text-xs font-mono uppercase tracking-wider"
+                        />
+                        <button
+                          type="button"
+                          disabled={couponLoading || !couponCode.trim()}
+                          onClick={() => handleApplyCoupon()}
+                          className="gold-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                        >
+                          {couponLoading ? "Applying..." : "Apply"}
+                        </button>
+                      </div>
+
+                      {/* Available Coupons list */}
+                      {availableCoupons.length > 0 && (
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                            Available Coupons:
+                          </p>
+                          {availableCoupons.map((c: any) => {
+                            const discountBadge = c.discountType === "percentage"
+                              ? `${c.discountValue}% OFF`
+                              : `₹${Number(c.discountValue).toLocaleString("en-IN")} OFF`;
+                            const isApplicable = !c.minBookingAmount || subtotal >= Number(c.minBookingAmount);
+
+                            return (
+                              <div
+                                key={c.id || c.code}
+                                onClick={() => isApplicable && handleApplyCoupon(c.code)}
+                                className={`flex items-center justify-between gap-2 p-2 rounded-xl border text-xs transition ${isApplicable
+                                  ? "bg-white/[0.02] border-white/10 hover:border-gold/50 hover:bg-gold/5 cursor-pointer"
+                                  : "bg-white/[0.01] border-white/5 opacity-50 cursor-not-allowed"
+                                  }`}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono font-bold text-gold">{c.code}</span>
+                                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                                      {discountBadge}
+                                    </span>
+                                  </div>
+                                  {c.description && (
+                                    <p className="text-[10px] text-muted-foreground truncate mt-0.5">{c.description}</p>
+                                  )}
+                                  {c.minBookingAmount && (
+                                    <p className="text-[9px] text-muted-foreground/80 mt-0.5">
+                                      Min spend: ₹{Number(c.minBookingAmount).toLocaleString("en-IN")}
+                                    </p>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={!isApplicable || couponLoading}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isApplicable) handleApplyCoupon(c.code);
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold shrink-0 transition ${isApplicable
+                                    ? "border border-gold/40 text-gold hover:bg-gold hover:text-black cursor-pointer"
+                                    : "border border-white/10 text-muted-foreground opacity-50 cursor-not-allowed"
+                                    }`}
+                                >
+                                  Apply
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="flex items-center justify-between w-full text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
-                      <span>Coupon <strong>{appliedCoupon.code}</strong> Applied (-₹{couponDiscount})</span>
-                      <button type="button" onClick={handleRemoveCoupon} className="text-muted-foreground hover:text-white underline cursor-pointer">
+                      <span>Coupon <strong>{appliedCoupon.code}</strong> Applied (-₹{couponDiscount.toLocaleString("en-IN")})</span>
+                      <button type="button" onClick={handleRemoveCoupon} className="text-rose-400 hover:text-rose-300 font-bold underline cursor-pointer">
                         Remove
                       </button>
                     </div>
@@ -1033,10 +1207,19 @@ export function ManualBookingModal({ onClose, onCreated }: ManualBookingModalPro
                         min={1}
                         max={totalAmount}
                         value={advanceAmount || ""}
-                        onChange={(e) => setAdvanceAmount(Number(e.target.value))}
+                        onChange={(e) => {
+                          setAdvanceAmount(Number(e.target.value));
+                          clearFieldError("advanceAmount");
+                        }}
                         placeholder="e.g. 1000"
-                        className="luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1"
+                        className={`luxury-input w-full rounded-lg px-3 py-2 text-sm mt-1 ${fieldErrors.advanceAmount ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""
+                          }`}
                       />
+                      {fieldErrors.advanceAmount && (
+                        <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                          <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.advanceAmount}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground uppercase font-medium">

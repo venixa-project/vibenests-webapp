@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Filter, Download, Plus, X, Check, ChevronRight, ChevronLeft, Eye, Clock, Sparkles, Tag, Percent, ClipboardPen } from "lucide-react";
+import { Search, Filter, Download, Plus, X, Check, ChevronRight, ChevronLeft, Eye, Clock, Sparkles, Tag, Percent, ClipboardPen, UserCheck, UserPlus, Users, AlertCircle, Gift, Info, CheckCircle2 } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DateRangePicker } from "@/components/admin/DateRangePicker";
 import { useAppData } from "@/components/admin/AppDataContext";
@@ -141,12 +141,25 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   // Step 1 state
   const [guest, setGuest] = useState(emptyGuest);
+  const [guestType, setGuestType] = useState<"existing" | "new">("existing");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   // User Special Offers & Coupons State
   const [userSpecialOffers, setUserSpecialOffers] = useState<any[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [selectedSpecialOffer, setSelectedSpecialOffer] = useState<any | null>(null);
 
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
   const [couponDiscount, setCouponDiscount] = useState<number>(0);
@@ -156,6 +169,19 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
   useEffect(() => {
     suitesApi.getAll().then((list) => setSuites(list as ApiSuite[])).catch(() => { });
     addonsApi.getAll().then((list) => setAddons(list as ApiAddon[])).catch(() => { });
+
+    // Fetch all available active coupons for admin booking flow
+    setLoadingCoupons(true);
+    couponsApi.getActive()
+      .then((list) => {
+        setAvailableCoupons(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        couponsApi.getAll()
+          .then((list) => setAvailableCoupons(Array.isArray(list) ? list : []))
+          .catch(() => setAvailableCoupons([]));
+      })
+      .finally(() => setLoadingCoupons(false));
   }, []);
 
   // Fetch assigned special offers whenever selected registered user changes
@@ -195,6 +221,7 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
     const duration = selectedSuite.slotDurationMins ?? 150;
     setStartTime(slot);
     setEndTime(getEndTime(slot, duration));
+    clearFieldError("startTime");
   }
 
   const suitePrice = selectedSuite ? Number(selectedSuite.price) : 0;
@@ -219,21 +246,23 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const totalAmount = Math.max(0, subtotal - totalDiscount);
 
   // Handle Coupon Apply
-  async function handleApplyCoupon() {
-    if (!couponCode.trim()) return;
+  async function handleApplyCoupon(codeToApply?: string) {
+    const code = (typeof codeToApply === "string" ? codeToApply : couponCode).trim().toUpperCase();
+    if (!code) return;
     setCouponLoading(true);
     setCouponError("");
     try {
       const res = await couponsApi.validate({
-        code: couponCode.trim().toUpperCase(),
+        code,
         bookingAmount: subtotal,
       });
       if (res?.valid) {
-        setAppliedCoupon(res.coupon || { code: couponCode.trim().toUpperCase() });
+        setAppliedCoupon(res.coupon || { code });
         setCouponDiscount(Number(res.discountAmount || 0));
-        toast.success(`Coupon "${couponCode.trim().toUpperCase()}" applied!`);
+        setCouponCode(code);
+        toast.success(`Coupon "${code}" applied successfully!`);
       } else {
-        setCouponError(res?.message || "Invalid or ineligible coupon code");
+        setCouponError(res?.message || "Invalid or ineligible coupon code for current subtotal");
       }
     } catch (e: any) {
       setCouponError(e?.message || "Failed to validate coupon");
@@ -247,29 +276,60 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
     setCouponDiscount(0);
     setCouponCode("");
     setCouponError("");
+    toast.info("Coupon removed");
   }
 
-  function validateStep0() {
-    if (!date) return t("app.admin.selectDate", "Please select a date.");
-    if (!startTime) return t("app.admin.startTime", "Please select a start time.");
-    if (!endTime) return t("app.admin.endTime", "Please select an end time.");
-    if (!selectedSuite) return t("app.admin.selectSuite", "Please select a suite.");
-    return "";
-  }
+  function validateStep0(): boolean {
+    const errors: Record<string, string> = {};
+    if (!date) errors.date = "Please select a booking date.";
+    if (!occasion || occasion === "All") errors.occasion = "Please select an occasion.";
+    if (!selectedSuite) errors.suite = "Please select a suite.";
+    if (!startTime) errors.startTime = "Please select an available time slot.";
 
-  function validateStep1() {
-    if (!guest.firstName.trim()) return t("app.admin.firstName", "First name is required.");
-    if (!guest.lastName.trim()) return t("app.admin.lastName", "Last name is required.");
-    if (guest.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email.trim())) {
-      return t("app.admin.email", "Valid email is required.");
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError("Please fill the all required details to continue.");
+      return false;
     }
-    if (guest.phone.length < 6) return t("app.admin.phone", "Valid phone number is required.");
-    return "";
+    setError("");
+    return true;
+  }
+
+  function validateStep1(): boolean {
+    const errors: Record<string, string> = {};
+    if (guestType === "existing" && !selectedRegisteredUserId) {
+      errors.registeredUser = "Please search and select an existing registered customer.";
+    }
+    if (!guest.firstName.trim()) errors.firstName = "First name is required.";
+    if (!guest.lastName.trim()) errors.lastName = "Last name is required.";
+
+    const cleanPhone = guest.phone.replace(/\D/g, "");
+    if (!cleanPhone) {
+      errors.phone = "Phone number is required.";
+    } else if (cleanPhone.length < 10) {
+      errors.phone = "Please enter a valid 10-digit phone number.";
+    }
+
+    if (guest.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email.trim())) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError("Please fill in all required guest details correctly.");
+      return false;
+    }
+    setError("");
+    return true;
   }
 
   function handleNext() {
-    const err = step === 0 ? validateStep0() : validateStep1();
-    if (err) { setError(err); return; }
+    if (step === 0) {
+      if (!validateStep0()) return;
+    } else if (step === 1) {
+      if (!validateStep1()) return;
+    }
+    setFieldErrors({});
     setError("");
     setStep((s) => s + 1);
   }
@@ -349,32 +409,71 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.selectDate", "Date")}</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-between">
+                  <span>{t("app.admin.selectDate", "Date")} <span className="text-rose-400">*</span></span>
+                </label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    clearFieldError("date");
+                  }}
                   min={new Date().toISOString().split("T")[0]}
-                  className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5"
-                  style={{ colorScheme: "dark" }} />
+                  className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${fieldErrors.date ? "border-rose-500 bg-rose-500/5 focus:border-rose-400" : ""}`}
+                  style={{ colorScheme: "dark" }}
+                />
+                {fieldErrors.date && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.date}
+                  </p>
+                )}
               </div>
+
               <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.occasion", "Occasion")}</label>
-                <select value={occasion} onChange={(e) => setOccasion(e.target.value)}
-                  className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 bg-transparent cursor-pointer">
+                <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-between">
+                  <span>{t("app.admin.occasion", "Occasion")} <span className="text-rose-400">*</span></span>
+                </label>
+                <select
+                  value={occasion}
+                  onChange={(e) => {
+                    setOccasion(e.target.value);
+                    clearFieldError("occasion");
+                  }}
+                  className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 bg-transparent cursor-pointer ${fieldErrors.occasion ? "border-rose-500 bg-rose-500/5" : ""}`}
+                >
                   {occasions.filter((o) => o !== "All").map((o) => (
                     <option key={o} value={o} className="bg-[oklch(0.13_0.025_260)]">{o}</option>
                   ))}
                 </select>
+                {fieldErrors.occasion && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.occasion}
+                  </p>
+                )}
               </div>
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.selectSuite", "Select Suite")}</label>
-              <div className="mt-1.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground uppercase tracking-wide">
+                  {t("app.admin.selectSuite", "Select Suite")} <span className="text-rose-400">*</span>
+                </label>
+                {selectedSuite && (
+                  <span className="text-[11px] text-gold font-semibold">Selected: {selectedSuite.name}</span>
+                )}
+              </div>
+
+              <div className={`mt-1.5 space-y-2 rounded-xl p-1 ${fieldErrors.suite ? "border border-rose-500/60 bg-rose-500/5" : ""}`}>
                 {suites.map((s) => (
                   <div key={s.id}
-                    onClick={() => setSelectedSuite(s)}
+                    onClick={() => {
+                      setSelectedSuite(s);
+                      clearFieldError("suite");
+                    }}
                     className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition
                       ${selectedSuite?.id === s.id
-                        ? "border-[var(--gold)] bg-[var(--gold)]/10"
+                        ? "border-[var(--gold)] bg-[var(--gold)]/10 shadow-sm shadow-gold/10"
                         : "border-white/10 hover:border-[var(--gold)]/40 bg-white/[0.02]"}`}>
                     <div>
                       <p className="text-sm text-foreground font-medium">{s.name}</p>
@@ -387,11 +486,19 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
                   </div>
                 ))}
               </div>
+              {fieldErrors.suite && (
+                <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                  <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.suite}
+                </p>
+              )}
             </div>
 
             {selectedSuite && date ? (
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.selectTimeSlot", "Select Time Slot")}</label>
+                <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-between">
+                  <span>{t("app.admin.selectTimeSlot", "Select Time Slot")} <span className="text-rose-400">*</span></span>
+                  {startTime && <span className="text-[11px] text-gold font-semibold">{startTime} – {endTime}</span>}
+                </label>
                 {(() => {
                   const slots = generateSlots(
                     selectedSuite.slotStartTime ?? "09:00",
@@ -402,39 +509,46 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
                   return slots.length === 0 ? (
                     <p className="text-xs text-rose-400">No slots defined for this suite's settings.</p>
                   ) : (
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                      {slots.map((slot) => {
-                        const isBlocked = blockedSlots.includes(slot);
-                        const isSelected = startTime === slot;
-                        return (
-                          <button
-                            key={slot}
-                            type="button"
-                            disabled={isBlocked}
-                            onClick={() => handleSelectSlot(slot)}
-                            className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-medium transition
-                              ${isSelected
-                                ? "border-[var(--gold)] bg-[var(--gold)]/10 text-gold font-semibold shadow-[0_0_12px_rgba(212,160,60,0.15)]"
-                                : isBlocked
-                                  ? "border-red-500/20 bg-red-500/5 text-rose-400/60 opacity-60 cursor-not-allowed"
-                                  : "border-white/10 hover:border-[var(--gold)]/40 hover:bg-white/[0.04] text-muted-foreground hover:text-foreground"
-                              }`}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <Clock className={`h-3.5 w-3.5 ${isSelected ? "text-gold" : isBlocked ? "text-rose-400/40" : "text-muted-foreground"}`} />
-                              <span>{slot}</span>
-                            </div>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded border ${isSelected
+                    <div>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {slots.map((slot) => {
+                          const isBlocked = blockedSlots.includes(slot);
+                          const isSelected = startTime === slot;
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              disabled={isBlocked}
+                              onClick={() => handleSelectSlot(slot)}
+                              className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-medium transition
+                                ${isSelected
+                                  ? "border-[var(--gold)] bg-[var(--gold)]/10 text-gold font-semibold shadow-[0_0_12px_rgba(212,160,60,0.15)]"
+                                  : isBlocked
+                                    ? "border-red-500/20 bg-red-500/5 text-rose-400/60 opacity-60 cursor-not-allowed"
+                                    : "border-white/10 hover:border-[var(--gold)]/40 hover:bg-white/[0.04] text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <Clock className={`h-3.5 w-3.5 ${isSelected ? "text-gold" : isBlocked ? "text-rose-400/40" : "text-muted-foreground"}`} />
+                                <span>{slot}</span>
+                              </div>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded border ${isSelected
                                 ? "border-gold/30 bg-gold/10 text-gold"
                                 : isBlocked
                                   ? "border-red-500/20 bg-red-500/10 text-rose-400"
                                   : "border-white/10 bg-white/5 text-muted-foreground"
-                              }`}>
-                              {isBlocked ? "Blocked" : "Available"}
-                            </span>
-                          </button>
-                        );
-                      })}
+                                }`}>
+                                {isBlocked ? "Blocked" : "Available"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {fieldErrors.startTime && (
+                        <p className="mt-1.5 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                          <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.startTime}
+                        </p>
+                      )}
                     </div>
                   );
                 })()}
@@ -471,133 +585,260 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
         {/* ── Step 1: Guest Details ── */}
         {step === 1 && (
-          <div className="space-y-3">
-            <div className="relative">
-              <label className="text-xs text-gold uppercase tracking-wide font-medium">{t("app.admin.selectRegisteredUser", "Select Registered User (Optional)")}</label>
-              <div className="relative mt-0.5">
-                <input
-                  type="text"
-                  placeholder={t("app.admin.searchRegisteredUser", "Type to search user by name or email...")}
-                  value={userSearch}
-                  onChange={(e) => {
-                    setUserSearch(e.target.value);
-                    setShowUserDropdown(true);
+          <div className="space-y-4">
+            {/* ── Task 3: Existing User vs New Guest Toggle Buttons ── */}
+            <div>
+              <label className="text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">
+                Customer Type <span className="text-rose-400">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2 p-1 bg-white/[0.03] border border-white/10 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuestType("existing");
+                    clearFieldError("registeredUser");
                   }}
-                  onFocus={() => setShowUserDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowUserDropdown(false), 200)}
-                  className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm"
-                />
-                {userSearch && (
-                  <button
-                    type="button"
-                onClick={() => {
-                      setUserSearch("");
-                      setShowUserDropdown(false);
-                      setSelectedRegisteredUserId(null);
-                      setGuest(emptyGuest);
+                  className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition cursor-pointer ${guestType === "existing"
+                    ? "bg-gold text-black shadow-md shadow-gold/20"
+                    : "text-muted-foreground hover:text-white"
+                    }`}
+                >
+                  <UserCheck className="h-4 w-4" />
+                  <span>Existing User</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuestType("new");
+                    setSelectedRegisteredUserId(null);
+                    setUserSearch("");
+                    setGuest(emptyGuest);
+                    clearFieldError("registeredUser");
+                  }}
+                  className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition cursor-pointer ${guestType === "new"
+                    ? "bg-gold text-black shadow-md shadow-gold/20"
+                    : "text-muted-foreground hover:text-white"
+                    }`}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span>New Guest (Manual)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ── Existing User Search / Selection ── */}
+            {guestType === "existing" && (
+              <div className="relative space-y-1.5 p-3 rounded-xl border border-gold/30 bg-gold/5">
+                <label className="text-xs text-gold uppercase tracking-wide font-semibold flex items-center justify-between">
+                  <span>Search Registered User <span className="text-rose-400">*</span></span>
+                  {selectedRegisteredUserId && (
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">
+                      ✓ User Selected
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gold/60 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder={t("app.admin.searchRegisteredUser", "Type to search user by name, phone or email...")}
+                    value={userSearch}
+                    onChange={(e) => {
+                      setUserSearch(e.target.value);
+                      setShowUserDropdown(true);
+                      clearFieldError("registeredUser");
                     }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
-                  >
-                    ✕
-                   </button>
-                 )}
-                 {userAutofillError && (
-                   <div className="mt-1 text-[11px] text-rose-400">{userAutofillError}</div>
-                 )}
-                 {userAutofillLoading && (
-                   <div className="mt-1 text-[11px] text-muted-foreground">{t("app.admin.loadingUser", "Loading user details...")}</div>
-                 )}
-               </div>
-              {showUserDropdown && (
-                <div className="absolute z-[10000] w-full mt-1 bg-[oklch(0.15_0.02_260)] border border-[var(--gold)]/20 rounded-lg shadow-xl max-h-48 overflow-y-auto divide-y divide-white/[0.04]">
-                  {users
-                    .filter((u) => u.role !== "Admin")
-                    .filter(
+                    onFocus={() => setShowUserDropdown(true)}
+                    className={`luxury-input w-full rounded-lg pl-9 pr-8 py-2 text-sm ${fieldErrors.registeredUser ? "border-rose-500 bg-rose-500/10" : ""
+                      }`}
+                  />
+                  {userSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserSearch("");
+                        setShowUserDropdown(false);
+                        setSelectedRegisteredUserId(null);
+                        setGuest(emptyGuest);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {fieldErrors.registeredUser && (
+                  <p className="text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.registeredUser}
+                  </p>
+                )}
+
+                {userAutofillLoading && (
+                  <div className="text-[11px] text-gold animate-pulse">{t("app.admin.loadingUser", "Fetching fresh customer data...")}</div>
+                )}
+
+                {/* Dropdown list */}
+                {showUserDropdown && (
+                  <div className="absolute z-[10000] left-0 right-0 top-full mt-1 bg-[oklch(0.15_0.02_260)] border border-[var(--gold)]/30 rounded-xl shadow-2xl max-h-52 overflow-y-auto divide-y divide-white/[0.06] backdrop-blur-xl">
+                    {users
+                      .filter((u) => u.role !== "Admin")
+                      .filter(
+                        (u) =>
+                          u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+                          u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+                          (u.phone && String(u.phone).includes(userSearch))
+                      )
+                      .map((u) => (
+                        <div
+                          key={u.id}
+                          onMouseDown={async (e) => {
+                            e.preventDefault();
+                            setUserAutofillError("");
+                            setSelectedRegisteredUserId(Number(u.id));
+                            setShowUserDropdown(false);
+                            clearFieldError("registeredUser");
+
+                            const fullName = u.name;
+                            const [first, ...rest] = String(fullName).split(" ");
+                            setGuest({
+                              firstName: first || "",
+                              lastName: rest.join(" ") || "",
+                              email: u.email || "",
+                              phone: u.phone || "",
+                            });
+                            setUserSearch(`${fullName} (${u.email || u.phone || "No Email"})`);
+                            clearFieldError("firstName");
+                            clearFieldError("lastName");
+                            clearFieldError("phone");
+
+                            try {
+                              setUserAutofillLoading(true);
+                              const userRes = await usersApi.getById(String(u.id));
+                              const freshFullName = userRes?.fullName || u.name;
+                              const [freshFirst, ...freshRest] = String(freshFullName).split(" ");
+                              setGuest({
+                                firstName: freshFirst || "",
+                                lastName: freshRest.join(" ") || "",
+                                email: userRes?.email ?? u.email,
+                                phone: userRes?.phone ?? u.phone ?? "",
+                              });
+                              setUserSearch(`${freshFullName} (${userRes?.email ?? u.email})`);
+                            } catch (err: any) {
+                              console.warn("Background user fetch fallback:", err);
+                            } finally {
+                              setUserAutofillLoading(false);
+                            }
+                          }}
+                          className="px-3.5 py-2.5 text-xs hover:bg-[var(--gold)]/15 text-foreground cursor-pointer transition flex items-center justify-between"
+                        >
+                          <div>
+                            <span className="font-semibold text-foreground block">{u.name}</span>
+                            <span className="text-muted-foreground text-[10px]">{u.email || "No Email"} · {u.phone || "No Phone"}</span>
+                          </div>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-gold/40" />
+                        </div>
+                      ))}
+                    {users.filter((u) => u.role !== "Admin").filter(
                       (u) =>
                         u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-                        u.email.toLowerCase().includes(userSearch.toLowerCase())
-                    )
-                    .map((u) => (
-                      <div
-                        key={u.id}
-                        onMouseDown={async (e) => {
-                          e.preventDefault(); // Prevents input onBlur from closing the dropdown before selection completes
-                          setUserAutofillError("");
-                          setSelectedRegisteredUserId(Number(u.id));
-                          setShowUserDropdown(false);
+                        u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+                        (u.phone && String(u.phone).includes(userSearch))
+                    ).length === 0 && (
+                        <div className="px-4 py-3 text-xs text-muted-foreground text-center">
+                          {t("app.admin.noUsersFound", "No registered customer found")}
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+            )}
 
-                          // Autofill instantly from the local user object for responsive UX
-                          const fullName = u.name;
-                          const [first, ...rest] = String(fullName).split(" ");
-                          setGuest({
-                            firstName: first || "",
-                            lastName: rest.join(" ") || "",
-                            email: u.email || "",
-                            phone: u.phone || "",
-                          });
-                          setUserSearch(`${fullName} (${u.email})`);
+            {/* ── Guest Name & Contact Inputs ── */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-between">
+                  <span>{t("app.admin.firstName", "First Name")} <span className="text-rose-400">*</span></span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="John"
+                  value={guest.firstName}
+                  onChange={(e) => {
+                    setGuest((g) => ({ ...g, firstName: e.target.value }));
+                    clearFieldError("firstName");
+                  }}
+                  className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${fieldErrors.firstName ? "border-rose-500 bg-rose-500/5" : ""}`}
+                />
+                {fieldErrors.firstName && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.firstName}
+                  </p>
+                )}
+              </div>
 
-                          // Fetch fresh details in the background
-                          try {
-                            setUserAutofillLoading(true);
-                            const userRes = await usersApi.getById(String(u.id));
-                            const freshFullName = userRes?.fullName || u.name;
-                            const [freshFirst, ...freshRest] = String(freshFullName).split(" ");
-                            setGuest({
-                              firstName: freshFirst || "",
-                              lastName: freshRest.join(" ") || "",
-                              email: userRes?.email ?? u.email,
-                              phone: userRes?.phone ?? u.phone ?? "",
-                            });
-                            setUserSearch(`${freshFullName} (${userRes?.email ?? u.email})`);
-                          } catch (err: any) {
-                            console.warn("Background user fetch failed, using local user data:", err);
-                          } finally {
-                            setUserAutofillLoading(false);
-                          }
-                        }}
-                        className="px-3 py-2 text-xs hover:bg-[var(--gold)]/10 text-foreground cursor-pointer transition flex flex-col"
-                      >
-                        <span className="font-medium">{u.name}</span>
-                        <span className="text-muted-foreground text-[10px]">{u.email}</span>
-                      </div>
-                    ))}
-                  {users.filter((u) => u.role !== "Admin").filter(
-                    (u) =>
-                      u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-                      u.email.toLowerCase().includes(userSearch.toLowerCase())
-                  ).length === 0 && (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">{t("app.admin.noUsersFound", "No users found")}</div>
-                    )}
-                </div>
-              )}
+              <div>
+                <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-between">
+                  <span>{t("app.admin.lastName", "Last Name")} <span className="text-rose-400">*</span></span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Doe"
+                  value={guest.lastName}
+                  onChange={(e) => {
+                    setGuest((g) => ({ ...g, lastName: e.target.value }));
+                    clearFieldError("lastName");
+                  }}
+                  className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${fieldErrors.lastName ? "border-rose-500 bg-rose-500/5" : ""}`}
+                />
+                {fieldErrors.lastName && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.lastName}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: t("app.admin.firstName", "First Name"), key: "firstName", placeholder: "John" },
-                { label: t("app.admin.lastName", "Last Name"), key: "lastName", placeholder: "Doe" },
-              ].map(({ label, key, placeholder }) => (
-                <div key={key}>
-                  <label className="text-xs text-muted-foreground uppercase tracking-wide">{label}</label>
-                  <input type="text" placeholder={placeholder}
-                    value={guest[key as keyof typeof guest]}
-                    onChange={(e) => setGuest((g) => ({ ...g, [key]: e.target.value }))}
-                    className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-                </div>
-              ))}
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.emailOptional", "Email (Optional)")}</label>
-              <input type="email" placeholder="guest@example.com"
-                value={guest.email} onChange={(e) => setGuest((g) => ({ ...g, email: e.target.value }))}
-                className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.phone", "Phone")}</label>
-              <input type="tel" placeholder="+91 98765 43210"
-                value={guest.phone} onChange={(e) => setGuest((g) => ({ ...g, phone: e.target.value }))}
-                className="luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+              <div>
+                <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-between">
+                  <span>{t("app.admin.phone", "Phone Number")} <span className="text-rose-400">*</span></span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="9876543210"
+                  value={guest.phone}
+                  onChange={(e) => {
+                    setGuest((g) => ({ ...g, phone: e.target.value }));
+                    clearFieldError("phone");
+                  }}
+                  className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${fieldErrors.phone ? "border-rose-500 bg-rose-500/5" : ""}`}
+                />
+                {fieldErrors.phone && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.phone}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs text-muted-foreground uppercase tracking-wide">{t("app.admin.emailOptional", "Email (Optional)")}</label>
+                <input
+                  type="email"
+                  placeholder="guest@example.com"
+                  value={guest.email}
+                  onChange={(e) => {
+                    setGuest((g) => ({ ...g, email: e.target.value }));
+                    clearFieldError("email");
+                  }}
+                  className={`luxury-input w-full rounded-lg px-3 py-1.5 text-sm mt-0.5 ${fieldErrors.email ? "border-rose-500 bg-rose-500/5" : ""}`}
+                />
+                {fieldErrors.email && (
+                  <p className="mt-1 text-[11px] text-rose-400 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.email}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* ── Assigned Special Offers Section ── */}
@@ -626,11 +867,10 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
                     <div
                       key={offer.id}
                       onClick={() => setSelectedSpecialOffer(isSelected ? null : offer)}
-                      className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${
-                        isSelected
-                          ? "bg-gold/15 border-gold shadow-md shadow-gold/10"
-                          : "bg-white/[0.02] border-white/10 hover:border-gold/40"
-                      }`}
+                      className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${isSelected
+                        ? "bg-gold/15 border-gold shadow-md shadow-gold/10"
+                        : "bg-white/[0.02] border-white/10 hover:border-gold/40"
+                        }`}
                     >
                       <div className="min-w-0 space-y-0.5">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -652,11 +892,10 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
                           e.stopPropagation();
                           setSelectedSpecialOffer(isSelected ? null : offer);
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition ${
-                          isSelected
-                            ? "bg-gold text-black shadow-xs"
-                            : "border border-gold/40 text-gold hover:bg-gold/10"
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition cursor-pointer ${isSelected
+                          ? "bg-gold text-black shadow-xs font-bold"
+                          : "border border-gold/40 text-gold hover:bg-gold/10"
+                          }`}
                       >
                         {isSelected ? "✓ Applied" : "Apply"}
                       </button>
@@ -666,28 +905,40 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
               </div>
             )}
 
-            {/* ── Coupon Code Section ── */}
-            <div className="pt-2 border-t border-white/10 space-y-1.5">
-              <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                <Tag className="h-3 w-3 text-gold" />
-                <span>Apply Coupon Code</span>
-              </label>
+            {/* ── Task 4: Available Coupons Grid & Code Application ── */}
+            <div className="pt-2 border-t border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-gold uppercase tracking-wide font-semibold flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-gold" />
+                  <span>Available Coupons & Promo Codes</span>
+                </label>
+                {availableCoupons.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    {availableCoupons.length} Active {availableCoupons.length === 1 ? "Coupon" : "Coupons"}
+                  </span>
+                )}
+              </div>
 
+              {/* Applied Coupon Banner */}
               {appliedCoupon ? (
-                <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs">
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-emerald-400 uppercase tracking-wider">{appliedCoupon.code}</span>
-                    <span className="text-emerald-300 font-medium">(-₹{couponDiscount.toLocaleString("en-IN")})</span>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <div>
+                      <span className="font-mono font-bold text-emerald-400 uppercase tracking-wider">{appliedCoupon.code}</span>
+                      <span className="text-emerald-300 font-semibold ml-2">(-₹{couponDiscount.toLocaleString("en-IN")})</span>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleRemoveCoupon}
-                    className="text-[11px] text-rose-400 hover:underline cursor-pointer font-medium"
+                    className="text-xs text-rose-400 hover:text-rose-300 hover:underline cursor-pointer font-bold px-2 py-0.5"
                   >
                     Remove
                   </button>
                 </div>
               ) : (
+                /* Manual Input */
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -697,19 +948,78 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
                       setCouponCode(e.target.value);
                       setCouponError("");
                     }}
-                    className="luxury-input flex-1 rounded-lg px-3 py-1.5 text-sm uppercase"
+                    className="luxury-input flex-1 rounded-lg px-3 py-1.5 text-sm uppercase font-mono tracking-wider"
                   />
                   <button
                     type="button"
                     disabled={!couponCode.trim() || couponLoading}
-                    onClick={handleApplyCoupon}
+                    onClick={() => handleApplyCoupon()}
                     className="gold-btn px-4 py-1.5 rounded-lg text-xs font-semibold shrink-0 disabled:opacity-50 cursor-pointer"
                   >
                     {couponLoading ? "Checking..." : "Apply"}
                   </button>
                 </div>
               )}
-              {couponError && <p className="text-[11px] text-rose-400">{couponError}</p>}
+              {couponError && <p className="text-[11px] text-rose-400 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {couponError}</p>}
+
+              {/* Available Coupons List (Matching User Booking Flow) */}
+              {!appliedCoupon && availableCoupons.length > 0 && (
+                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                    Click to Apply Coupon:
+                  </p>
+                  {availableCoupons.map((c: any) => {
+                    const discountBadge = c.discountType === "percentage"
+                      ? `${c.discountValue}% OFF`
+                      : `₹${Number(c.discountValue).toLocaleString("en-IN")} OFF`;
+                    const isApplicable = !c.minBookingAmount || subtotal >= Number(c.minBookingAmount);
+
+                    return (
+                      <div
+                        key={c.id || c.code}
+                        onClick={() => isApplicable && handleApplyCoupon(c.code)}
+                        className={`flex items-center justify-between gap-3 p-2 rounded-xl border text-xs transition ${isApplicable
+                          ? "bg-white/[0.02] border-white/10 hover:border-gold/50 hover:bg-gold/5 cursor-pointer"
+                          : "bg-white/[0.01] border-white/5 opacity-50 cursor-not-allowed"
+                          }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-gold tracking-wider">{c.code}</span>
+                            <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                              {discountBadge}
+                            </span>
+                          </div>
+                          {c.description && (
+                            <p className="text-[10px] text-muted-foreground truncate mt-0.5">{c.description}</p>
+                          )}
+                          {c.minBookingAmount && (
+                            <p className="text-[9px] text-muted-foreground/80 mt-0.5">
+                              Min booking: ₹{Number(c.minBookingAmount).toLocaleString("en-IN")}
+                              {!isApplicable && <span className="text-amber-400 ml-1">(Add more to apply)</span>}
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={!isApplicable || couponLoading}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isApplicable) handleApplyCoupon(c.code);
+                          }}
+                          className={`px-3 py-1 rounded-lg text-[11px] font-semibold shrink-0 transition ${isApplicable
+                            ? "border border-gold/40 text-gold hover:bg-gold hover:text-black cursor-pointer"
+                            : "border border-white/10 text-muted-foreground opacity-50 cursor-not-allowed"
+                            }`}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -979,9 +1289,9 @@ export default function BookingsPage() {
             <DateRangePicker value={dateRange} onChange={setDateRange} />
             <button
               onClick={() => setShowManualEntry(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-[var(--gold)]/40 bg-[var(--gold)]/10 text-gold hover:bg-[var(--gold)]/20 shadow-md shadow-gold/10 transition active:scale-95 cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-blue-500/50 bg-gradient-to-r from-blue-600/30 via-indigo-600/30 to-purple-600/30 text-blue-200 hover:text-white hover:border-blue-400 hover:from-blue-600/50 hover:to-purple-600/50 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 transition-all duration-200 active:scale-95 cursor-pointer backdrop-blur-md"
             >
-              <ClipboardPen className="h-3.5 w-3.5" /> {t("app.admin.manualEntry", "Manual Entry")}
+              <ClipboardPen className="h-4 w-4 text-blue-400" /> {t("app.admin.manualEntry", "Manual Entry")}
             </button>
             <button
               onClick={() => setShowNewBooking(true)}
@@ -1015,8 +1325,8 @@ export default function BookingsPage() {
           )}
           <button onClick={() => { setSearch(""); setStatusFilter("All"); setOccasionFilter("All"); setSuiteFilter("All"); setDateFilter(""); }}
             className="text-xs text-muted-foreground hover:text-gold transition px-3 py-2 rounded-lg border border-white/10 hover:border-[var(--gold)]/30">{t("app.admin.clear", "Clear")}</button>
-          <button 
-            onClick={() => exportToCSV(filtered, "Bookings_Export.csv")} 
+          <button
+            onClick={() => exportToCSV(filtered, "Bookings_Export.csv")}
             className="flex items-center gap-2 text-xs font-semibold gold-btn px-4 py-2 rounded-xl shadow-md shadow-gold/15 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer ml-auto"
           >
             <Download className="h-4 w-4" /> {t("app.admin.export", "Export")}
@@ -1028,8 +1338,8 @@ export default function BookingsPage() {
             <button
               onClick={() => setActiveTab('bookings')}
               className={`pb-2.5 px-4 text-sm font-medium transition-all border-b-2 cursor-pointer ${activeTab === 'bookings'
-                  ? 'border-[var(--gold)] text-gold font-semibold'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'border-[var(--gold)] text-gold font-semibold'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
             >
               {t("app.admin.allBookings", "All Bookings")} ({filtered.length})
@@ -1037,8 +1347,8 @@ export default function BookingsPage() {
             <button
               onClick={() => setActiveTab('refunds')}
               className={`pb-2.5 px-4 text-sm font-medium transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${activeTab === 'refunds'
-                  ? 'border-[var(--gold)] text-gold font-semibold'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'border-[var(--gold)] text-gold font-semibold'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
             >
               Refund & Cancellation Requests
@@ -1226,8 +1536,8 @@ export default function BookingsPage() {
                           <td className="py-3 pr-4">
                             <span
                               className={`px-2.5 py-1 rounded-full text-[11px] font-medium border ${b.fullPaymentReceived || b.paymentMode === "package_credit"
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                                 }`}
                             >
                               {b.fullPaymentReceived || b.paymentMode === "package_credit"

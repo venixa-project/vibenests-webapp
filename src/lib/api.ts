@@ -1,6 +1,6 @@
 import i18n from '../i18n';
 
-export const BASE_URL = import.meta.env.DEV ? 'http://localhost:5000' : 'https://api.vibenests.in';
+export const BASE_URL = import.meta.env.VITE_API_URL || '';
 const BASE = BASE_URL;
 
 function getToken() {
@@ -392,3 +392,13 @@ export const globalSettingsApi = {
   updateBulk: (settingsMap: Record<string, any>) =>
     request<{ message: string }>('/global-settings', { method: 'POST', body: JSON.stringify(settingsMap) }),
 };
+
+export const notificationsApi = {
+  getWhatsAppLogs: () => request<any[]>('/notifications/whatsapp/logs'),
+  sendWhatsApp: (data: { phone: string; message: string; messageType?: string; templateName?: string; userName?: string }) =>
+    request<{ message: string; result: any; ok: boolean }>('/notifications/send/whatsapp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
