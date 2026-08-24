@@ -41,6 +41,46 @@ interface MessageLog {
 
 export const META_TEMPLATES = [
   {
+    id: "booking_confirmation",
+    name: "Booking Confirmation (Utility)",
+    metaTemplateName: "booking_confirmation",
+    category: "Utility",
+    content: "Dear {{1}}, Your booking at Vibenests has been confirmed successfully. Booking ID: {{2}} Suite: {{3}} Check-in: {{4}} Check-out: {{5}} Guests: {{6}} We look forward to welcoming you to Vibenests and making your stay comfortable and memorable. Thank you for choosing Vibenests.",
+    buttonLabel: null,
+    buttonUrl: null,
+    status: "Meta Approved"
+  },
+  {
+    id: "booking_cancellation",
+    name: "Booking Cancellation (Utility)",
+    metaTemplateName: "booking_cancellation",
+    category: "Utility",
+    content: "Dear {{1}}, Your booking at Vibenests has been cancelled successfully. Booking ID: {{2}} Room/Suite: {{3}} Check-in Date: {{4}} Cancellation Date: {{5}} If applicable, your refund will be processed according to the cancellation and refund policy. Thank you for choosing Vibenests.",
+    buttonLabel: null,
+    buttonUrl: null,
+    status: "Meta Approved"
+  },
+  {
+    id: "refund_confirmation",
+    name: "Refund Confirmation (Utility)",
+    metaTemplateName: "refund_confirmation",
+    category: "Utility",
+    content: "Dear {{1}}, Your refund for the Vibenests booking has been successfully initiated. Booking ID: {{2}} Refund Amount: ₹{{3}} Refund Reference: {{4}} The amount will be credited to your original payment method as per the payment provider's processing timeline. Thank you for choosing Vibenests.",
+    buttonLabel: null,
+    buttonUrl: null,
+    status: "Meta Approved"
+  },
+  {
+    id: "coupon_offer",
+    name: "Coupon & Special Offer (Marketing)",
+    metaTemplateName: "coupon_offer",
+    category: "Marketing",
+    content: "Dear {{1}}, Enjoy an exclusive offer from Vibenests! ✨ Use coupon code {{2}} and get {{3}} on your next stay. Offer valid until: {{4}} Book your stay and experience comfort at Vibenests. Terms & conditions apply.",
+    buttonLabel: null,
+    buttonUrl: null,
+    status: "Meta Approved"
+  },
+  {
     id: "vibenests_celebration_booking",
     name: "VibeNests Celebration Booking (Marketing)",
     metaTemplateName: "vibenests_celebration_booking",
@@ -260,9 +300,9 @@ export default function CommunicationPage() {
   const uniqueTypes = Array.from(new Set(logs.map((l) => l.messageType))).filter(Boolean);
 
   const totalCount = logs.length;
-  const deliveredLogs = logs.filter((l) => l.status === "Delivered" || l.status === "Read");
+  const deliveredLogs = logs.filter((l) => l.status === "Delivered" || l.status === "Read" || l.status === "Sent");
   const readLogs = logs.filter((l) => l.status === "Read");
-  const pendingLogs = logs.filter((l) => l.status === "Pending" || l.status === "Sent");
+  const pendingLogs = logs.filter((l) => l.status === "Pending");
   const failedLogs = logs.filter((l) => l.status === "Failed");
 
   const deliveredCount = deliveredLogs.length;
@@ -571,12 +611,16 @@ export default function CommunicationPage() {
                                 let badgeColor = "bg-white/5 border-white/10 text-muted-foreground";
                                 if (type.includes("OTP")) {
                                   badgeColor = "bg-amber-500/15 border-amber-500/30 text-amber-300";
+                                } else if (type.includes("Cancellation") || type.includes("Cancelled")) {
+                                  badgeColor = "bg-rose-500/15 border-rose-500/30 text-rose-400";
                                 } else if (type.includes("Booking")) {
                                   badgeColor = "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
                                 } else if (type.includes("Payment")) {
                                   badgeColor = "bg-sky-500/15 border-sky-500/30 text-sky-400";
                                 } else if (type.includes("Account")) {
                                   badgeColor = "bg-purple-500/15 border-purple-500/30 text-purple-400";
+                                } else if (type.includes("Coupon") || type.includes("Offer") || type.includes("Special")) {
+                                  badgeColor = "bg-yellow-500/15 border-yellow-500/30 text-yellow-300";
                                 } else if (type.includes("Marketing") || type.includes("Celebration")) {
                                   badgeColor = "bg-indigo-500/15 border-indigo-500/30 text-indigo-400";
                                 } else if (type.includes("Refund")) {
@@ -950,6 +994,36 @@ export default function CommunicationPage() {
                       </option>
                     </select>
                   </div>
+
+                  {sendTemplate !== "custom" && (
+                    <div className="p-3 rounded-xl bg-gold/5 border border-gold/20 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-gold tracking-wider flex items-center gap-1">
+                          <Check className="h-3 w-3 text-gold" /> Meta Template Preview
+                        </span>
+                        <span className="text-[10px] text-muted-foreground font-mono bg-white/5 px-2 py-0.5 rounded">
+                          {META_TEMPLATES.find((t) => t.id === sendTemplate)?.category}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed text-[11px]">
+                        {(() => {
+                          const tpl = META_TEMPLATES.find((t) => t.id === sendTemplate);
+                          if (!tpl) return "";
+                          let preview = tpl.content.replace("{{1}}", recipientName || "Guest");
+                          if (tpl.id === "booking_confirmation") {
+                            preview = preview.replace("{{2}}", "#VN1001").replace("{{3}}", "Royal Celebration Suite").replace("{{4}}", "24 Aug 2026, 06:00 PM").replace("{{5}}", "24 Aug 2026, 09:00 PM").replace("{{6}}", "2 Guests");
+                          } else if (tpl.id === "booking_cancellation") {
+                            preview = preview.replace("{{2}}", "#VN1001").replace("{{3}}", "Royal Celebration Suite").replace("{{4}}", "24 Aug 2026").replace("{{5}}", "24 Aug 2026");
+                          } else if (tpl.id === "refund_confirmation") {
+                            preview = preview.replace("{{2}}", "#VN1001").replace("{{3}}", "1,500").replace("{{4}}", "RFND-1001");
+                          } else if (tpl.id === "coupon_offer") {
+                            preview = preview.replace("{{2}}", "VIBE2026").replace("{{3}}", "20% OFF").replace("{{4}}", "31 Dec 2026");
+                          }
+                          return preview;
+                        })()}
+                      </p>
+                    </div>
+                  )}
 
                   {sendTemplate === "custom" && (
                     <div className="space-y-1.5">
